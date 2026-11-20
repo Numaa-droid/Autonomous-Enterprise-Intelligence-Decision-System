@@ -1,0 +1,31 @@
+{"id": "a1", "doc": "AAPL", "question": "What were Apple's total net sales in fiscal year 2025?", "evidence": "Total net sales \\$? ?416,161", "pages": [25, 26, 32, 39, 51]}
+{"id": "a2", "doc": "AAPL", "question": "How much did Apple spend on research and development in 2025?", "evidence": "Research and development \\$? ?34,550", "pages": [27, 32]}
+{"id": "a3", "doc": "AAPL", "question": "How many people did Apple employ at the end of fiscal 2025?", "evidence": "166,000 full-time equivalent employees", "pages": [7]}
+{"id": "a4", "doc": "AAPL", "question": "How many of its own shares did Apple buy back during 2025, and for how much?", "evidence": "repurchased 402 million shares", "pages": [47]}
+{"id": "a5", "doc": "AAPL", "question": "What was Apple's effective tax rate in 2025?", "evidence": "Effective tax rate 15\\.6", "pages": [28, 44]}
+{"id": "a6", "doc": "AAPL", "question": "In which countries are Apple's products manufactured?", "evidence": "outsourcing partners (that are )?located primarily in China mainland", "pages": [9, 11, 49]}
+{"id": "a7", "doc": "AAPL", "question": "What quarterly dividend per share was Apple paying at the end of fiscal 2025?", "evidence": "quarterly cash dividend was \\$0\\.26", "pages": [29]}
+{"id": "m1", "doc": "MSFT", "question": "What was Microsoft's total revenue in fiscal year 2025?", "evidence": "Total revenue \\$? ?281,724", "pages": [40]}
+{"id": "m2", "doc": "MSFT", "question": "How many full-time employees did Microsoft have as of June 30, 2025?", "evidence": "228,000 people", "pages": [18]}
+{"id": "m3", "doc": "MSFT", "question": "How big did Azure's annual revenue become in fiscal 2025?", "evidence": "Azure surpassed \\$75 billion", "pages": [3]}
+{"id": "m4", "doc": "MSFT", "question": "How much money has Microsoft committed to fund OpenAI?", "evidence": "total funding commitments of \\$13 billion", "pages": [50]}
+{"id": "m5", "doc": "MSFT", "question": "What was Microsoft's effective income tax rate for fiscal 2025?", "evidence": "effective tax rate for both fiscal years 2025 and 2024 was 18", "pages": [31]}
+{"id": "m6", "doc": "MSFT", "question": "What was Microsoft's net income for fiscal year 2025?", "evidence": "Net income \\$? ?101,832", "pages": [27, 40, 41, 43, 44]}
+{"id": "n1", "doc": "NVDA", "question": "What was NVIDIA's revenue for fiscal year 2026?", "evidence": "Revenue \\$ ?215,938", "pages": [125, 139, 166, 167]}
+{"id": "n2", "doc": "NVDA", "question": "What was NVIDIA's net income in fiscal 2026?", "evidence": "Net income \\$ ?120,067", "pages": [125, 139, 140, 143, 151]}
+{"id": "n3", "doc": "NVDA", "question": "How dependent is NVIDIA on its largest customers?", "evidence": "one direct customer represented 22% of total revenue", "pages": [111, 129, 166]}
+{"id": "n4", "doc": "NVDA", "question": "Which companies manufacture NVIDIA's chips?", "evidence": "We utilize foundries, such as Taiwan Semiconductor", "pages": [96]}
+{"id": "n5", "doc": "NVDA", "question": "How fast did NVIDIA's data center networking revenue grow in fiscal 2026?", "evidence": "networking revenue increased 142", "pages": [23]}
+{"id": "n6", "doc": "NVDA", "question": "How many employees does NVIDIA have?", "evidence": "approximately 42,000 employees", "pages": [99]}
+{"id": "n7", "doc": "NVDA", "question": "What US export restrictions affect NVIDIA's sales to China?", "evidence": "announced export restrictions and export licensing requirements targeting China", "pages": [98, 114]}
+{"id": "t1", "doc": "TSLA", "question": "What were Tesla's total revenues in 2025?", "evidence": "Total revenues \\$? ?94,827", "pages": [40, 53, 58]}
+{"id": "t2", "doc": "TSLA", "question": "What was Tesla's net income attributable to common stockholders in 2025?", "evidence": "net income attributable to common stockholders (was \\$3\\.79 billion|\\$ ?3,794)", "pages": [34, 53, 65]}
+{"id": "t3", "doc": "TSLA", "question": "How much energy storage did Tesla deploy in 2025?", "evidence": "deployed 46\\.7 GWh", "pages": [34]}
+{"id": "t4", "doc": "TSLA", "question": "How much revenue did Tesla earn from selling regulatory credits in 2025?", "evidence": "Automotive regulatory credits \\$? ?1,993", "pages": [40, 53, 58]}
+{"id": "t5", "doc": "TSLA", "question": "Where are Tesla's main factories located?", "evidence": "Gigafactory Texas Austin, Texas", "pages": [31]}
+{"id": "g1", "doc": "GOOG", "question": "What were Alphabet's total revenues in 2025?", "evidence": "Total revenues[^A-Za-z]{0,40}402,836", "pages": [39, 68, 98]}
+{"id": "g2", "doc": "GOOG", "question": "What was Alphabet's net income in 2025?", "evidence": "Net income[^A-Za-z]{0,40}132,170", "pages": [38, 56, 57, 58, 59, 91]}
+{"id": "g3", "doc": "GOOG", "question": "How much revenue did YouTube advertising generate in 2025?", "evidence": "YouTube ads[^A-Za-z]{0,30}40,367", "pages": [39, 68]}
+{"id": "g4", "doc": "GOOG", "question": "How much did Alphabet spend buying back its shares in 2025?", "evidence": "repurchased and subsequently retired 240 million shares", "pages": [46]}
+{"id": "g5", "doc": "GOOG", "question": "What share of Alphabet's revenue comes from online advertising?", "evidence": "more than 70% of total revenues from online advertising", "pages": [14]}
+{"id": "g6", "doc": "GOOG", "question": "What annual revenue run rate did Google Cloud reach by the end of 2025?", "evidence": "annual run rate of over \\$70 billion", "pages": [3]}

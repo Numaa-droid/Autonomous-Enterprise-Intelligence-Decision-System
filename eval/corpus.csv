@@ -1,0 +1,6 @@
+key,company,document_type,fiscal_year,file,sha256,pages,source_url
+AAPL,Apple Inc.,annual_report,2025,NASDAQ_AAPL_2025.pdf,3eb270b22acb7d8d8e9c32a43dc221dec3345f8e4bca02755fdbc1ee16c823de,80,
+MSFT,Microsoft Corporation,annual_report,2025,NASDAQ_MSFT_2025.pdf,e88c300dcc58dcc93a88fa4afc6bd7b2e63a2095c7a6479d49d57692e1d19a6d,88,
+NVDA,NVIDIA Corporation,annual_report,2026,NASDAQ_NVDA_2026.pdf,510a0b90a6ae3751842c5cdcfcf2ca3683e663e718e118c171da190817cfdde1,175,
+TSLA,"Tesla, Inc.",annual_report,2025,NASDAQ_TSLA_2025.pdf,65dd654744c3d7cfad92dbee66706a6f7e808b59adbb213cdffcdedeb968135a,139,
+GOOG,Alphabet Inc.,annual_report,2025,goog014907-ars.pdf,bf2062d542b6e60d0bb2968502151add670f0505a143427419bae4dfd44c0668,112,

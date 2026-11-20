@@ -1,0 +1,30 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv*/
+.pytest_cache/
+*.egg-info/
+
+# --- Secrets ---
+.env
+
+# --- Documents and outputs never go in git (CLAUDE.md rule 11) ---
+doc/
+*.pdf
+storage/
+output/
+reports/
+*.db
+*.log
+*.log.1
+logs/
+
+# --- OS / editor ---
+.DS_Store
+.vscode/
+.idea/
+
+# --- TableLens models: only the fine-tuned Table Transformer is kept (Git LFS, .gitattributes).
+# Every other model downloads itself on first use; spotting_check.py regenerates its mmproj copy.
+tablelens/models/*
+!tablelens/models/tatr-finetuned-01-11/

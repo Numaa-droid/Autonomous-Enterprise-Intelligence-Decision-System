@@ -1,0 +1,1200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TableLens</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#060a14; --panel:rgba(15,22,40,.72); --panel2:rgba(22,31,54,.7); --line:rgba(148,163,184,.13); --line2:rgba(148,163,184,.24);
+  --text:#e7ecf6; --muted:#8d99b3; --dim:#5a6680;
+  --violet:#8b5cf6; --indigo:#6366f1; --cyan:#22d3ee; --ok:#2dd4bf; --unv:#60a5fa; --rej:#f59e0b; --err:#fb7185;
+  --grad:linear-gradient(135deg,#a78bfa 0%,#6366f1 45%,#22d3ee 100%);
+  --r:18px; --mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font:14px/1.55 Inter,system-ui,sans-serif;min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0;z-index:-2;background:
+  radial-gradient(900px 520px at 8% -8%,rgba(139,92,246,.24),transparent 62%),
+  radial-gradient(760px 520px at 100% 2%,rgba(34,211,238,.15),transparent 60%),
+  radial-gradient(800px 600px at 50% 115%,rgba(99,102,241,.14),transparent 60%)}
+body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background-image:linear-gradient(rgba(148,163,184,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(148,163,184,.05) 1px,transparent 1px);
+  background-size:46px 46px;mask-image:radial-gradient(ellipse 80% 60% at 50% 0%,#000 30%,transparent 75%)}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+.wrap{max-width:1580px;margin:0 auto;padding:0 28px 64px}
+.glass{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 20px 60px -30px rgba(0,0,0,.8),inset 0 1px 0 rgba(255,255,255,.04)}
+
+/* top bar */
+.top{display:flex;align-items:center;gap:14px;padding:22px 0}
+.logo{width:38px;height:38px;border-radius:11px;background:var(--grad);display:grid;place-items:center;box-shadow:0 8px 28px -6px rgba(99,102,241,.7)}
+.brand b{font-size:17px;font-weight:800;letter-spacing:-.02em}
+.brand span{display:block;color:var(--muted);font-size:12px;margin-top:-2px}
+.chip-model{margin-left:auto;display:flex;align-items:center;gap:8px;font:500 12px var(--mono);color:#c7d2fe;padding:7px 12px;border:1px solid var(--line2);border-radius:999px;background:rgba(99,102,241,.08)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 4px rgba(45,212,191,.15)}
+
+/* hero */
+.hero{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:28px;align-items:center;padding:26px 0 34px}
+.eyebrow{display:inline-flex;gap:8px;align-items:center;font:600 11px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:#a5b4fc;padding:6px 11px;border-radius:999px;border:1px solid rgba(139,92,246,.35);background:rgba(139,92,246,.1)}
+h1{font-size:clamp(32px,4.2vw,54px);line-height:1.04;letter-spacing:-.035em;font-weight:800;margin:18px 0 16px}
+.grad{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.lead{color:var(--muted);font-size:15.5px;max-width:560px}
+.steps{display:flex;flex-wrap:wrap;gap:10px;margin-top:26px}
+.step{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:12px;background:var(--panel2);border:1px solid var(--line);font-weight:500;font-size:13px}
+.step i{font:600 11px var(--mono);font-style:normal;width:22px;height:22px;border-radius:7px;display:grid;place-items:center;background:rgba(99,102,241,.2);color:#c7d2fe}
+.step-arrow{color:var(--dim);align-self:center}
+.step{transition:border-color .25s,box-shadow .25s,color .25s}
+.step.on{border-color:rgba(139,92,246,.65);color:#fff;box-shadow:0 0 0 4px rgba(139,92,246,.12),0 0 28px -4px rgba(99,102,241,.55)}
+.step.on i{background:var(--grad);color:#fff;animation:pulse 1.2s infinite}
+
+/* activity log */
+.logp{margin-top:16px;border-radius:14px;border:1px solid var(--line);background:rgba(2,6,23,.7);overflow:hidden}
+.log-h{display:flex;align-items:center;gap:10px;padding:8px 10px 8px 12px;border-bottom:1px solid var(--line);font-size:12.5px}
+.live{display:flex;align-items:center;gap:6px;font:600 10px var(--mono);text-transform:uppercase;letter-spacing:.1em;color:var(--dim);padding:3px 8px;border-radius:999px;background:rgba(148,163,184,.1)}
+.live i{width:6px;height:6px;border-radius:50%;background:var(--dim)}
+.live.on{color:#5eead4;background:rgba(45,212,191,.12)}
+.live.on i{background:var(--ok);box-shadow:0 0 8px var(--ok);animation:pulse 1.2s infinite}
+.live.err{color:#fda4af;background:rgba(251,113,133,.12)}.live.err i{background:var(--err)}
+.log-n{margin-left:auto;font:500 11px var(--mono);color:var(--dim)}
+.ibtn.sm{width:28px;height:28px;border-radius:8px}
+.log{height:240px;overflow:auto;padding:6px 0 8px;font:11.5px/1.55 var(--mono);scrollbar-width:thin}
+.le{display:grid;grid-template-columns:58px 34px 14px minmax(0,1fr) auto;gap:8px;align-items:baseline;padding:2px 12px;animation:lin .3s ease-out}
+.le.first{margin-top:5px;padding-top:6px;border-top:1px dashed rgba(148,163,184,.1)}
+@keyframes lin{from{opacity:0;transform:translateX(-6px)}}
+.le .t{color:#475569}
+.le .pg{justify-self:start;font-size:10px;line-height:1;padding:3px 5px;border-radius:5px;background:rgba(99,102,241,.16);color:#a5b4fc}
+.le .pg:empty{background:none}
+.le .ic{text-align:center;font-weight:700;color:#64748b}
+.le .m{color:#cbd5e1;overflow-wrap:anywhere}
+.le .d{color:#475569;font-size:10.5px}
+.le.ok .ic{color:var(--ok)}.le.ok .m{color:#ccfbf1}
+.le.tag-table{box-shadow:inset 3px 0 0 #2dd4bf;background:rgba(45,212,191,.05)}.le.tag-table .ic{color:#2dd4bf}.le.tag-table .m{color:#5eead4}
+.le.tag-chart{box-shadow:inset 3px 0 0 #a3e635;background:rgba(163,230,53,.06)}.le.tag-chart .ic{color:#a3e635}.le.tag-chart .m{color:#d9f99d}
+.le.tag-picture{box-shadow:inset 3px 0 0 #f97316;background:rgba(249,115,22,.05)}.le.tag-picture .ic{color:#f97316}.le.tag-picture .m{color:#fed7aa}
+.le.tag-text{box-shadow:inset 3px 0 0 #eab308;background:rgba(234,179,8,.05)}.le.tag-text .ic{color:#eab308}.le.tag-text .m{color:#fef08a}
+.le.warn .ic{color:var(--rej)}.le.warn .m{color:#fde68a}
+.le.err .ic,.le.err .m{color:var(--err)}
+.le.stage-model .ic{color:#a78bfa}.le.stage-render .ic{color:#38bdf8}
+
+.upload{padding:22px}
+.vh{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.drop{display:block;position:relative;border-radius:14px;padding:38px 22px;text-align:center;cursor:pointer;transition:.25s;
+  background:linear-gradient(var(--bg),var(--bg)) padding-box,linear-gradient(135deg,rgba(139,92,246,.6),rgba(34,211,238,.5)) border-box;border:1.5px dashed transparent}
+.drop:hover,.drop.over{transform:translateY(-2px);box-shadow:0 0 0 6px rgba(99,102,241,.12),0 24px 50px -24px rgba(99,102,241,.6)}
+.drop.over{background:linear-gradient(rgba(99,102,241,.12),rgba(99,102,241,.12)) padding-box,var(--grad) border-box}
+.drop:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}
+.drop-ico{width:60px;height:60px;margin:0 auto 14px;border-radius:18px;display:grid;place-items:center;background:rgba(99,102,241,.14);border:1px solid rgba(139,92,246,.35)}
+.drop h3{font-size:16px;font-weight:600}
+.drop h3 u{text-decoration:none;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.drop p{color:var(--muted);font-size:12.5px;margin-top:6px}
+.pill{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:14px;background:var(--panel2);border:1px solid var(--line2)}
+.pill .pdf{width:42px;height:48px;border-radius:9px;display:grid;place-items:center;font:700 10px var(--mono);color:#fff;background:linear-gradient(160deg,#f43f5e,#be123c);box-shadow:0 8px 20px -8px #f43f5e}
+.pill b{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:340px}
+.pill span{color:var(--muted);font-size:12px}
+.pill .x{margin-left:auto;width:32px;height:32px;border-radius:9px;color:var(--muted)}
+.pill .x:hover{background:rgba(251,113,133,.12);color:var(--err)}
+.jsonup{display:flex;align-items:center;gap:12px;margin-top:12px;padding:11px 14px;border-radius:12px;border:1px dashed var(--line2);color:var(--muted);font-size:12.5px;cursor:pointer;transition:.2s}
+.jsonup:hover,.jsonup.over{border-color:rgba(34,211,238,.55);color:var(--text);background:rgba(34,211,238,.06)}
+.jsonup:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}
+.jsonup b{display:block;color:var(--text);font-size:13px}
+.jsonup code{font:500 11.5px var(--mono);color:#5eead4}
+.controls{display:grid;grid-template-columns:1fr auto;gap:18px;margin:20px 0 18px}
+.ctl label{display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px}
+.ctl label output{font:600 12px var(--mono);color:var(--text);background:rgba(99,102,241,.18);padding:1px 8px;border-radius:6px;letter-spacing:0}
+input[type=range]{width:100%;appearance:none;height:6px;border-radius:9px;background:linear-gradient(90deg,var(--violet),var(--cyan)) 0/var(--p,50%) 100% no-repeat,rgba(148,163,184,.18);outline:none}
+input[type=range]::-webkit-slider-thumb{appearance:none;width:18px;height:18px;border-radius:50%;background:#fff;border:4px solid var(--indigo);box-shadow:0 2px 10px rgba(99,102,241,.6);cursor:pointer}
+input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:#fff;border:4px solid var(--indigo)}
+.seg{display:inline-flex;padding:3px;border-radius:11px;background:rgba(2,6,23,.6);border:1px solid var(--line)}
+.seg button{padding:6px 12px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--muted);transition:.2s}
+.seg button.on{background:var(--panel2);color:var(--text);box-shadow:0 0 0 1px var(--line2),0 4px 14px -6px rgba(0,0,0,.6)}
+.run{width:100%;height:52px;border-radius:14px;font-weight:700;font-size:15px;color:#fff;background:var(--grad);display:flex;align-items:center;justify-content:center;gap:10px;
+  box-shadow:0 14px 34px -14px rgba(99,102,241,.9),inset 0 1px 0 rgba(255,255,255,.25);transition:.2s;position:relative;overflow:hidden}
+.run:hover:not(:disabled){transform:translateY(-1px);filter:brightness(1.08)}
+.run:disabled{opacity:.45;cursor:not-allowed}
+.run.busy::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.25),transparent 70%);animation:sheen 1.4s infinite}
+@keyframes sheen{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+.spin{width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;animation:rot .8s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+.prog{margin-top:16px}
+.bar{height:6px;border-radius:9px;background:rgba(148,163,184,.14);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--grad);border-radius:9px;transition:width .35s;box-shadow:0 0 16px rgba(34,211,238,.6)}
+.prog-txt{display:flex;justify-content:space-between;font:500 12px var(--mono);color:var(--muted);margin-top:8px}
+
+/* results */
+.section-h{display:flex;align-items:center;gap:12px;margin:8px 0 16px}
+.section-h h2{font-size:20px;letter-spacing:-.02em}
+.banner{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:13px;padding:8px 14px;border-radius:12px;background:rgba(45,212,191,.1);border:1px solid rgba(45,212,191,.35);color:#99f6e4}
+.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:14px}
+.stat{padding:18px 18px 16px;position:relative;overflow:hidden}
+.stat::before{content:"";position:absolute;inset:0 0 auto;height:2px;background:var(--c,var(--line2));opacity:.9}
+.stat .k{font-size:11.5px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;display:flex;align-items:center;gap:8px}
+.stat .k i{width:8px;height:8px;border-radius:3px;background:var(--c,var(--dim))}
+.stat .v{font-size:34px;font-weight:800;letter-spacing:-.04em;margin:6px 0 2px;font-variant-numeric:tabular-nums}
+.stat .s{font-size:12px;color:var(--dim)}
+.stat.hero-stat{background:linear-gradient(160deg,rgba(99,102,241,.22),rgba(34,211,238,.08)),var(--panel);border-color:rgba(139,92,246,.4)}
+.stat.hero-stat .v{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.mapcard{margin-top:14px;padding:16px 18px}
+.map-h{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:12px;font-size:12.5px;color:var(--muted)}
+.map-h b{color:var(--text);font-size:13px}
+.legend{display:flex;gap:14px;margin-left:auto;flex-wrap:wrap}
+.legend span{display:flex;align-items:center;gap:6px}
+.legend i{width:10px;height:10px;border-radius:3px}
+.map{display:flex;flex-wrap:wrap;gap:5px}
+.cell{width:26px;height:30px;border-radius:6px;font:600 9.5px var(--mono);display:grid;place-items:center;color:var(--dim);background:rgba(148,163,184,.07);border:1px solid var(--line);transition:.15s}
+.cell.pending{animation:pulse 1.6s infinite}
+@keyframes pulse{50%{opacity:.4}}
+.cell.n0{color:var(--muted)}
+.cell.t1{background:rgba(45,212,191,.2);border-color:rgba(45,212,191,.55);color:#ccfbf1}
+.cell.t2{background:rgba(139,92,246,.32);border-color:rgba(167,139,250,.7);color:#ede9fe}
+.cell.rj{background:rgba(245,158,11,.14);border-color:rgba(245,158,11,.45);color:#fde68a}
+.cell.ch{background:rgba(163,230,53,.16);border-color:rgba(163,230,53,.6);color:#ecfccb}
+.cell.hc{box-shadow:inset 0 -3px 0 #a3e635}
+.cell:hover:not(.pending){transform:translateY(-2px)}
+.cell.on{outline:2px solid #fff;outline-offset:1px}
+
+.work{display:grid;grid-template-columns:minmax(0,1.32fr) minmax(0,1fr);gap:20px;margin-top:22px;align-items:start}
+.viewer{padding:0;overflow:hidden}
+.tool{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5;background:rgba(10,15,30,.88);backdrop-filter:blur(14px)}
+.tool h3{font-size:14px;display:flex;align-items:center;gap:8px}
+.tool .sp{flex:1}
+.layers{display:flex;gap:6px;flex-wrap:wrap}
+.layer{display:flex;align-items:center;gap:7px;padding:6px 10px;border-radius:9px;border:1px solid var(--line);font-size:12px;font-weight:600;color:var(--text);transition:.15s}
+.layer i{width:9px;height:9px;border-radius:3px;background:var(--lc)}
+.layer[aria-pressed=false]{color:var(--dim)}
+.layer[aria-pressed=false] i{background:transparent;box-shadow:inset 0 0 0 1.5px var(--lc)}
+.layer:hover{background:rgba(148,163,184,.08)}
+.pages{padding:18px;display:flex;flex-direction:column;gap:22px}
+.pages.only .page[data-tables="0"][data-charts="0"]{display:none}
+.pages.hide-tbl .box.ok,.pages.hide-tbl .box.unv,.pages.hide-rej .box.rej,.pages.hide-para .box.para,.pages.hide-list .box.list,.pages.hide-head .box.head,.pages.hide-pic .box.pic,.pages.hide-chart .box.chart,
+.pages.hide-cap .box.cap,.pages.hide-hf .box.hf,.pages.hide-txt .box.txt{display:none}
+.page{border-radius:14px;background:var(--panel2);border:1px solid var(--line);overflow:hidden;transition:border-color .2s,box-shadow .2s;scroll-margin-top:70px}
+.page.active{border-color:rgba(139,92,246,.55);box-shadow:0 0 0 4px rgba(139,92,246,.1)}
+.page-head{display:flex;align-items:center;gap:10px;padding:10px 14px}
+.pno{font:500 12px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.pno b{color:var(--text);font-size:14px}
+.pno i{font-style:normal;color:var(--dim);margin-left:4px}
+.chips{margin-left:auto;display:flex;gap:6px}
+.chip{font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:999px;background:rgba(148,163,184,.1);color:var(--muted);border:1px solid var(--line)}
+.chip.ok{background:rgba(45,212,191,.12);color:#5eead4;border-color:rgba(45,212,191,.35)}
+.chip.rej{background:rgba(245,158,11,.1);color:#fcd34d;border-color:rgba(245,158,11,.35)}
+.chip.unv{background:rgba(96,165,250,.12);color:#93c5fd;border-color:rgba(96,165,250,.35)}
+/* layout-region groups (textClass): one colour each, shared by page boxes, chips, layer toggles and log lines */
+.box.para,.chip.para,.rx.para{--bc:#8b5cf6}.box.list,.chip.list,.rx.list{--bc:#6366f1}.box.head,.chip.head,.rx.head{--bc:#ec4899}.box.pic,.chip.pic,.rx.pic{--bc:#f97316}
+.box.chart,.chip.chart{--bc:#a3e635}.box.cap,.chip.cap,.rx.cap{--bc:#22d3ee}.box.hf,.chip.hf,.rx.hf{--bc:#64748b}.box.txt,.chip.txt,.rx.txt{--bc:#eab308}
+.chip.para,.chip.list,.chip.head,.chip.pic,.chip.chart,.chip.cap,.chip.hf,.chip.txt{background:color-mix(in srgb,var(--bc) 13%,transparent);
+  color:color-mix(in srgb,var(--bc) 45%,#fff);border-color:color-mix(in srgb,var(--bc) 40%,transparent)}
+.fig{position:relative;background:#fff;line-height:0}
+.fig img{width:100%;display:block}
+.box{position:absolute;border:2px solid var(--bc);background:color-mix(in srgb,var(--bc) 9%,transparent);border-radius:3px;cursor:pointer;
+  box-shadow:0 0 0 1px rgba(0,0,0,.25),0 0 26px color-mix(in srgb,var(--bc) 45%,transparent);transition:background .15s,box-shadow .15s}
+.box.ok{--bc:#14b8a6}.box.unv{--bc:#3b82f6}.box.rej{--bc:#f59e0b;border-style:dashed}
+.box.ok,.box.unv,.box.rej{z-index:2}
+.box.tb{border-width:1.5px;box-shadow:none;background:color-mix(in srgb,var(--bc) 6%,transparent)}
+.box.tb .tag{opacity:0;transition:opacity .15s;color:#0b0f19;text-transform:capitalize}
+.box.para .tag,.box.list .tag,.box.head .tag,.box.hf .tag{color:#fff}
+.box.tb:hover .tag,.box.sel .tag{opacity:1}
+.box.chart{border-width:2px;background:color-mix(in srgb,var(--bc) 10%,transparent)}.box.chart .tag{opacity:1}
+.box:hover{background:color-mix(in srgb,var(--bc) 18%,transparent)}
+.box.sel{border-width:3px;animation:sel 1.6s ease-in-out infinite}
+@keyframes sel{50%{box-shadow:0 0 0 5px color-mix(in srgb,var(--bc) 30%,transparent),0 0 40px color-mix(in srgb,var(--bc) 70%,transparent)}}
+.box:focus-visible{outline:2px solid #111;outline-offset:2px}
+.tag{position:absolute;left:-2px;bottom:100%;margin-bottom:2px;white-space:nowrap;font:600 10.5px/1 var(--mono);padding:5px 7px;border-radius:5px 5px 5px 0;background:var(--bc);color:#04121a;box-shadow:0 4px 12px rgba(0,0,0,.25)}
+.box.in .tag{bottom:auto;top:2px;left:2px;border-radius:4px}
+.box.rej .tag{color:#2a1700}
+.box.cel{--bc:#0ea5e9;border-width:1px;box-shadow:none;background:transparent;z-index:3}
+.box.cel.hdr{--bc:#e11d48}
+.box.cel .tag{display:none}
+.box.cel.hl{border-width:2px;background:color-mix(in srgb,var(--bc) 28%,transparent)}
+.pages.hide-cel .box.cel{display:none}
+.sgrid{margin-top:10px;overflow:auto;max-height:560px;border-radius:10px;border:1px solid var(--line);background:#fff}
+.sgrid table{border-collapse:collapse;font:11.5px/1.35 Inter,system-ui,sans-serif;color:#0f172a;min-width:100%}
+.sgrid td,.sgrid th{border:1px solid #cbd5e1;padding:4px 7px;vertical-align:top;text-align:right;min-width:40px}
+.sgrid td:first-child{text-align:left;min-width:180px}
+.sgrid th{background:#ffe4e6;color:#9f1239;font-weight:600;text-align:center;position:sticky;top:0}
+.sgrid td.rh{background:#f1f5f9;font-weight:600}
+.sgrid td.sec{background:#e0f2fe;color:#075985;font-weight:600;text-align:left}
+.sgrid .hl{outline:2px solid #0ea5e9;outline-offset:-2px;background:#e0f2fe}
+.empty-pg{position:absolute;inset:auto 12px 12px auto;font:600 11px/1 var(--mono);padding:6px 9px;border-radius:7px;background:rgba(15,23,42,.8);color:#cbd5e1}
+
+/* json panel */
+.jsonp{position:sticky;top:16px;height:calc(100vh - 32px);display:flex;flex-direction:column;overflow:hidden}
+.jh{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.jh h3{font-size:14px}
+.ibtn{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;color:var(--muted);border:1px solid var(--line)}
+.ibtn:hover{color:var(--text);background:rgba(148,163,184,.1)}
+.jbody{flex:1;overflow:auto;padding:12px 0;font:12.5px/1.65 var(--mono);counter-reset:ln;background:rgba(2,6,23,.45)}
+.ln{white-space:pre-wrap;word-break:break-word;padding:0 16px 0 58px;text-indent:-58px;min-height:1.65em}
+.ln::before{counter-increment:ln;content:counter(ln);display:inline-block;width:58px;padding-right:14px;text-align:right;color:#334155;user-select:none;text-indent:0}
+.j-det{border-left:2px solid transparent;transition:background .3s}
+.j-det:hover{background:rgba(148,163,184,.05)}
+.j-det.sel{background:rgba(139,92,246,.13);border-left-color:var(--violet)}
+.j-det.flash{animation:flash 1.2s}
+@keyframes flash{0%,40%{background:rgba(34,211,238,.25)}}
+.j-key{color:#c4b5fd}.j-str{color:#5eead4}.j-num{color:#fbbf24}.j-bool{color:#f472b6}.j-null{color:#64748b}.j-dim{color:var(--dim);padding:0 18px;display:block}
+.jf{padding:10px 16px;border-top:1px solid var(--line);font:500 11.5px var(--mono);color:var(--dim);display:flex;justify-content:space-between}
+
+/* hero: phase labels + last activity line */
+.sgroup{font:600 10.5px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--dim);align-self:center}
+.plast{margin-top:8px;font:500 11.5px var(--mono);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.plast.ok{color:#5eead4}.plast.warn{color:#fcd34d}.plast.err{color:var(--err)}
+
+/* recognise card */
+.reccard{margin-top:14px;padding:20px 22px;border-color:rgba(139,92,246,.38);background:linear-gradient(160deg,rgba(99,102,241,.15),rgba(34,211,238,.04) 60%),var(--panel)}
+.rec-top{display:flex;align-items:center;gap:14px;margin-bottom:16px}
+.rec-ico{flex:none;width:42px;height:42px;border-radius:12px;background:var(--grad);display:grid;place-items:center;box-shadow:0 10px 26px -10px rgba(99,102,241,.9)}
+.rec-t b{font-size:16px;display:block;letter-spacing:-.01em}
+.rec-t span{color:var(--muted);font-size:13px}
+.rec-top .chip{margin-left:auto;flex:none}
+.chip.run-on{background:rgba(34,211,238,.12);color:#67e8f9;border-color:rgba(34,211,238,.4)}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.opt{text-align:left;display:grid;grid-template-columns:20px minmax(0,1fr);gap:4px 12px;padding:14px 16px;border-radius:14px;border:1px solid var(--line2);background:rgba(2,6,23,.45);transition:.2s}
+.opt:hover{border-color:rgba(139,92,246,.5)}
+.opt.on{border-color:rgba(139,92,246,.85);background:rgba(99,102,241,.14);box-shadow:0 0 0 4px rgba(139,92,246,.12)}
+.opt:disabled{opacity:.5;cursor:not-allowed}
+.opt .r{width:18px;height:18px;border-radius:50%;border:2px solid var(--line2);margin-top:2px;grid-row:span 4}
+.opt.on .r{border:5px solid var(--violet);background:#fff}
+.opt b{font-size:14px}
+.opt span{color:var(--muted);font-size:12.5px;line-height:1.45}
+.opt .flow{display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-top:6px;font:600 10.5px var(--mono);color:var(--dim)}
+.opt .flow i{font-style:normal;padding:2px 7px;border-radius:6px;border:1px solid var(--line2);color:#cbd5e1}
+.opt .flow i.tf{border-color:rgba(45,212,191,.45);color:#5eead4}.opt .flow i.vl{border-color:rgba(139,92,246,.55);color:#c4b5fd}
+.opt em{font:600 11.5px var(--mono);font-style:normal;color:#a5b4fc;margin-top:6px}
+.rec-bot{display:flex;align-items:center;gap:12px;margin-top:16px;flex-wrap:wrap}
+.rec-bot .lbl{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.rbtn{width:auto;margin-left:auto;padding:0 26px;height:46px}
+.need{display:flex;align-items:center;gap:12px;margin-top:14px;padding:11px 14px;border-radius:12px;border:1px solid rgba(245,158,11,.45);background:rgba(245,158,11,.08);color:#fde68a;font-size:13px}
+.need button{margin-left:auto;font-weight:600;padding:7px 12px;border-radius:9px;background:rgba(245,158,11,.2);color:#fff}
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:14px}
+.kpi{padding:10px 12px;border-radius:12px;background:rgba(2,6,23,.45);border:1px solid var(--line);border-top:2px solid var(--kc,var(--line2))}
+.kpi span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.kpi b{display:block;font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}
+.cell{position:relative}
+.cell.rc::after{content:"";position:absolute;right:2px;top:2px;width:5px;height:5px;border-radius:50%;background:var(--cyan);box-shadow:0 0 6px var(--cyan)}
+
+/* inspector (right side): recognition | pipeline log | JSON */
+.insp .jh{padding:10px}
+.itabs{width:100%;display:grid;grid-template-columns:repeat(3,1fr)}
+.itabs button{display:flex;align-items:center;justify-content:center;gap:7px}
+.badge{font:600 10.5px var(--mono);padding:1px 6px;border-radius:999px;background:rgba(99,102,241,.22);color:#c7d2fe}
+.iview{flex:1;min-height:0;display:flex;flex-direction:column}
+.ih{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);min-height:50px}
+.ih>span{color:var(--muted);font:500 11.5px var(--mono);margin-left:auto}
+.rbody{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:14px;scrollbar-width:thin}
+.rcard{flex:none;border-radius:14px;border:1px solid var(--line);background:var(--panel2);overflow:hidden;scroll-margin-top:8px}
+.rcard>header{display:flex;align-items:center;gap:8px;padding:11px 12px 8px;flex-wrap:wrap}
+.rcard>header b{font-size:13.5px}
+.eng{margin-left:auto;font:600 11px var(--mono);padding:3px 9px;border-radius:999px;border:1px solid var(--line)}
+.eng.tf{background:rgba(45,212,191,.13);color:#5eead4;border-color:rgba(45,212,191,.38)}
+.eng.vl{background:rgba(139,92,246,.16);color:#c4b5fd;border-color:rgba(139,92,246,.48)}
+.eng.none{background:rgba(148,163,184,.08);color:var(--muted)}
+.route{display:flex;gap:8px;align-items:flex-start;margin:0 12px 8px;padding:7px 10px;border-radius:9px;font-size:12px;color:#cbd5e1;background:rgba(2,6,23,.45)}
+.route i{font-style:normal;font-weight:700;color:var(--cyan)}
+.rmeta{display:flex;flex-wrap:wrap;gap:6px;padding:0 12px 10px}
+.rmeta span{font:500 11px var(--mono);color:var(--muted);padding:2px 7px;border-radius:6px;background:rgba(148,163,184,.08)}
+.rcard .sgrid{margin:0 12px 10px;max-height:440px}
+.ract{display:flex;gap:6px;padding:0 12px 12px}
+.ract button{font-size:12px;font-weight:600;padding:5px 10px;border-radius:8px;border:1px solid var(--line);color:var(--muted)}
+.ract button:hover{color:var(--text);background:rgba(148,163,184,.08)}
+.rcard.pending{border-style:dashed;background:transparent}
+.rnote{padding:0 12px 12px;color:var(--muted);font-size:12.5px}
+.rtext{margin:0 12px 12px;padding:10px 12px;border-radius:10px;background:rgba(2,6,23,.6);border:1px solid var(--line);font:12px/1.55 var(--mono);color:#cbd5e1;white-space:pre-wrap;word-break:break-word;max-height:300px;overflow:auto}
+.rcard.flash{animation:flash 1.2s}
+/* recognised text regions, in PDF order between the table / chart cards: styled like the page (colour = layout group) */
+.rx{flex:none;margin:-6px 0;padding:2px 10px;border-left:3px solid var(--bc,#64748b);color:#cbd5e1;font-size:13px;line-height:1.55;
+  white-space:pre-wrap;word-break:break-word;scroll-margin-top:8px}
+.rx.head{font-size:15px;font-weight:700;color:var(--text);margin-top:4px}
+.rx.list{padding-left:24px;text-indent:-12px}.rx.list::before{content:"• "}
+.rx.cap{font-size:12px;font-style:italic;color:var(--muted)}
+.rx.hf{font-size:11px;color:var(--dim)}
+.rx.pic{font:500 11.5px var(--mono);color:var(--dim);border-left-style:dashed}
+.rx.flash{animation:flash 1.2s}
+.ttl{padding:12px 12px 0;display:flex;flex-direction:column;gap:2px}
+.ttl b{font-size:14.5px;font-weight:700;color:#f9a8d4}.ttl span{font-size:12px;color:var(--muted)}
+.rempty{margin:24px auto 0;text-align:center;color:var(--muted);padding:40px 24px;font-size:13px;max-width:360px}
+.rempty b{display:block;color:var(--text);font-size:15px;margin-bottom:6px}
+.iview .logp{margin:0;border:0;border-radius:0;background:transparent;flex:1;min-height:0;display:flex;flex-direction:column}
+.iview .log{height:auto;flex:1;background:rgba(2,6,23,.45)}
+.lfilter{display:flex;gap:6px;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--line)}
+.lfilter button{font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted);display:flex;align-items:center;gap:6px}
+.lfilter button i{width:7px;height:7px;border-radius:50%;background:var(--mc,var(--dim))}
+.lfilter button.on{color:var(--text);border-color:rgba(139,92,246,.6);background:rgba(99,102,241,.16)}
+.meter{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:6px;padding:8px 12px;border-bottom:1px solid var(--line)}
+.meter:empty{display:none}
+.meter span{display:flex;flex-direction:column;padding:6px 9px;border-radius:9px;background:rgba(2,6,23,.5);border:1px solid var(--line);border-left:3px solid var(--mc);font:500 10.5px var(--mono);color:var(--muted)}
+.meter b{font:600 11.5px Inter,system-ui,sans-serif;color:var(--text)}
+.log[data-f]:not([data-f=""]) .le{display:none}
+.log[data-f=render] .le.s-render,.log[data-f=model] .le.s-model,.log[data-f=check] .le.s-check,.log[data-f=structure] .le.s-structure,
+.log[data-f=vlm] .le.s-vlm,.log[data-f=err] .le.err,.log[data-f=err] .le.warn{display:grid}
+.le.phase{display:flex!important;align-items:center;gap:10px;margin:8px 0 4px;padding:6px 12px;font:600 10.5px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:#a5b4fc}
+.le.phase::before,.le.phase::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,transparent,rgba(139,92,246,.5),transparent)}
+.le.s-check .ic{color:#f472b6}.le.s-structure .ic{color:#2dd4bf}.le.s-vlm .ic{color:#c084fc}
+
+/* tooltip & toast */
+#tip{position:fixed;left:0;top:0;z-index:50;width:290px;padding:14px;border-radius:14px;background:rgba(10,15,30,.96);border:1px solid var(--line2);box-shadow:0 24px 50px -16px #000;pointer-events:none;opacity:0;transition:opacity .12s;font-size:12.5px}
+#tip.on{opacity:1}
+.tip-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;font-size:14px}
+.tip-r{display:flex;justify-content:space-between;padding:4px 0;border-top:1px solid var(--line);color:var(--muted)}
+.tip-r b{color:var(--text);font:500 12px var(--mono)}
+.tip-why{margin-top:9px;color:#cbd5e1;line-height:1.45}
+.tip-txt{margin-top:9px;padding:8px 10px;border-radius:8px;background:rgba(148,163,184,.08);color:#cbd5e1;font-size:12px;line-height:1.45;white-space:pre-line;max-height:130px;overflow:hidden}
+#toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,30px);opacity:0;z-index:60;padding:12px 18px;border-radius:12px;background:#111a2e;border:1px solid var(--line2);box-shadow:0 20px 40px -12px #000;transition:.25s;font-weight:500;max-width:calc(100vw - 32px)}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+#toast.err{border-color:rgba(251,113,133,.5);color:#fecdd3}
+[hidden]{display:none!important}
+
+@media (max-width:1200px){.stats{grid-template-columns:repeat(3,1fr)}}
+@media (max-width:1000px){.hero,.work{grid-template-columns:minmax(0,1fr)}.jsonp{position:relative;top:0;height:70vh}}
+@media (max-width:800px){.opts{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,1fr)}.rbtn{width:100%}}
+@media (max-width:600px){.le{grid-template-columns:50px 30px 12px minmax(0,1fr)}.le .d{display:none}.wrap{padding:0 16px 48px}.stats{grid-template-columns:repeat(2,1fr)}.controls{grid-template-columns:1fr}.chip-model{display:none}.stat .v{font-size:28px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="logo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M3 10h18M3 15h18M9 4v16M15 4v16"/></svg></div>
+    <div class="brand"><b>TableLens</b><span>Table detection &amp; recognition for medical reports</span></div>
+    <div class="chip-model"><span class="dot"></span>Table Transformer · Docling layout · PaddleOCR-VL-1.6</div>
+  </header>
+
+  <section class="hero">
+    <div>
+      <span class="eyebrow">Trained models only · no layout rules · <span id="where">runs locally</span></span>
+      <h1>Find and read every table in your <span class="grad">medical report</span></h1>
+      <p class="lead"><b>1 · Detect</b> — Microsoft's <b>Table Transformer</b> and IBM Docling's <b>layout model</b> find the tables, paragraphs, headings and pictures on every page.
+        <b>2 · Recognise</b> — Microsoft's <b>Table Transformer v1.1</b> reads each table's rows, columns and cells (bordered or borderless) and fills them with the PDF's own text. Tables printed sideways or without a text layer, and pictures, charts and scans, are read by <b>PaddleOCR-VL-1.6</b>.
+        Every lab test then comes out with its <b>value, unit and reference range</b>, flagged <b>High</b>, <b>Low</b> or <b>Abnormal</b> against the range the report prints.</p>
+      <div class="steps">
+        <span class="sgroup">Detect</span>
+        <div class="step" data-stage="render"><i>01</i>Render pages</div><span class="step-arrow">→</span>
+        <div class="step" data-stage="model"><i>02</i>Table Transformer</div><span class="step-arrow">→</span>
+        <div class="step" data-stage="check"><i>03</i>Layout model</div>
+        <span class="sgroup" style="margin-left:8px">Recognise</span>
+        <div class="step" data-stage="structure"><i>04</i>Table structure</div><span class="step-arrow">→</span>
+        <div class="step" data-stage="vlm"><i>05</i>PaddleOCR-VL</div>
+      </div>
+    </div>
+
+    <div class="glass upload">
+      <label class="drop" id="drop" for="file" tabindex="0" role="button" aria-label="Upload a PDF">
+        <div class="drop-ico"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#c4b5fd" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4m0 0l-4.5 4.5M12 4l4.5 4.5"/><path d="M4 15v3a2 2 0 002 2h12a2 2 0 002-2v-3"/></svg></div>
+        <h3>Drop your PDF or image here or <u>browse</u></h3>
+        <p>PDF, JPG or PNG · lab reports — blood counts, lipid, liver, kidney &amp; thyroid panels, urinalysis · <span id="privacy">never leaves this machine</span></p>
+      </label>
+      <!-- visually hidden, not display:none: some browsers refuse to open a display:none file input -->
+      <input type="file" id="file" accept="application/pdf,.pdf,image/jpeg,image/png,.jpg,.jpeg,.png" class="vh" tabindex="-1" aria-hidden="true">
+      <div class="pill" id="pill" hidden>
+        <div class="pdf">PDF</div>
+        <div><b id="fname"></b><span id="fsize"></span></div>
+        <button class="x" id="clear" aria-label="Remove file"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+      <label class="jsonup" id="jsonup" for="jfile" tabindex="0" role="button" aria-label="Open a saved result JSON">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5eead4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H6a2 2 0 00-2 2v4a2 2 0 01-2 2 2 2 0 012 2v4a2 2 0 002 2h2M16 3h2a2 2 0 012 2v4a2 2 0 002 2 2 2 0 00-2 2v4a2 2 0 01-2 2h-2"/></svg>
+        <span><b>Open a saved result</b>Drop or browse a <code>_tables.json</code> (detection) or <code>_structure.json</code> (recognition) from the <code>output</code> folder — no re-run needed</span>
+      </label>
+      <input type="file" id="jfile" accept="application/json,.json" class="vh" tabindex="-1" aria-hidden="true">
+
+      <div class="controls">
+        <div class="ctl">
+          <label for="th">Confidence threshold <output id="thv">0.50</output></label>
+          <input type="range" id="th" min="0.1" max="0.95" step="0.05" value="0.5">
+        </div>
+        <div class="ctl">
+          <label>Render DPI</label>
+          <div class="seg" id="dpi"><button data-v="100">100</button><button data-v="150" class="on">150</button><button data-v="200">200</button></div>
+        </div>
+      </div>
+      <button class="run" id="run" disabled><span id="runtxt">Detect tables</span><svg id="runico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+      <div class="prog" id="prog" hidden>
+        <div class="bar"><i id="bar"></i></div>
+        <div class="prog-txt"><span id="ptxt">Loading model…</span><span id="peta"></span></div>
+        <div class="plast" id="plast"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="results" hidden>
+    <div class="section-h">
+      <h2>Results</h2><span class="chip" id="rfile"></span>
+      <div class="banner" id="banner" hidden></div>
+    </div>
+    <div class="stats">
+      <div class="glass stat" style="--c:#94a3b8"><div class="k"><i></i>Total pages</div><div class="v" id="s-pages">0</div><div class="s" id="s-pages-s">–</div></div>
+      <div class="glass stat" style="--c:#2dd4bf"><div class="k"><i></i>Pages with tables</div><div class="v" id="s-pt">0</div><div class="s" id="s-pt-s">–</div></div>
+      <div class="glass stat hero-stat" style="--c:var(--grad)"><div class="k"><i style="background:var(--grad)"></i>Tables found</div><div class="v" id="s-t">0</div><div class="s" id="s-t-s">confirmed by the layout model</div></div>
+      <div class="glass stat" style="--c:#818cf8"><div class="k"><i></i>Model detections</div><div class="v" id="s-raw">0</div><div class="s" id="s-raw-s">–</div></div>
+      <div class="glass stat" style="--c:#f59e0b"><div class="k"><i></i>Rejected</div><div class="v" id="s-rej">0</div><div class="s">layout model saw text, not a table</div></div>
+      <div class="glass stat" style="--c:#8b5cf6"><div class="k"><i></i>Paragraphs</div><div class="v" id="s-para">0</div><div class="s" id="s-para-s">from the text layer</div></div>
+    </div>
+    <div class="glass mapcard">
+      <div class="map-h"><b>Page map</b><span>Click a page to jump to it</span>
+        <div class="legend"><span><i style="background:rgba(148,163,184,.25)"></i>No table</span><span><i style="background:#2dd4bf"></i>1 table</span><span><i style="background:#8b5cf6"></i>2+ tables</span><span><i style="background:#f59e0b"></i>Rejected only</span><span><i style="background:#a3e635"></i>Chart only</span><span><i style="background:#2dd4bf;box-shadow:inset 0 -3px 0 #a3e635"></i>Table + chart</span></div>
+      </div>
+      <div class="map" id="map"></div>
+    </div>
+
+    <div class="glass reccard" id="rec" hidden>
+      <div class="rec-top">
+        <div class="rec-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M3 10h18M9 10v10M15 10v10"/><path d="M6.5 7h3"/></svg></div>
+        <div class="rec-t"><b>Recognise</b><span>Read what is inside the detected tables — rows, columns, spans, headers and cell text. Results appear on the right, page by page.</span></div>
+        <span class="chip" id="rstate">not started</span>
+      </div>
+      <div class="opts" id="rmode" role="radiogroup" aria-label="What to recognise">
+        <button class="opt on" data-v="tables" role="radio" aria-checked="true"><i class="r"></i>
+          <b>Tables + Chart only</b>
+          <span>Every detected table: its grid from Table Transformer, the cell text from the PDF. A table printed sideways or without a text layer goes to PaddleOCR-VL instead. Every detected chart: its data as a table, read by PaddleOCR-VL.</span>
+          <div class="flow"><i class="tf">Table Transformer</i>→<i>PDF text</i><span>or</span><i class="vl">PaddleOCR-VL</i><span>+ charts</span><i class="vl">PaddleOCR-VL</i></div>
+          <em id="est-tables">–</em>
+        </button>
+        <button class="opt" data-v="all" role="radio" aria-checked="false"><i class="r"></i>
+          <b>Text + Tables + Chart</b>
+          <span>The whole page in PDF order: headings, paragraphs, lists, captions… from the PDF text layer, the tables as above and each chart's data as a table. Scans (no text layer), charts and pictures go to PaddleOCR-VL: a logo's or stamp's text, a picture of a table, a screenshot; QR codes and barcodes are decoded. Signatures and icons are not read.</span>
+          <div class="flow"><i>PDF text</i>+<i class="tf">Table Transformer</i>+<i class="vl">PaddleOCR-VL</i><span>scans · charts</span></div>
+          <em id="est-all">–</em>
+        </button>
+      </div>
+      <div class="rec-bot">
+        <span class="lbl">Pages</span>
+        <div class="seg" id="rscope"><button data-v="all" class="on">All pages</button><button data-v="page" id="rscope-page">Current page</button></div>
+        <button class="run rbtn" id="rrun"><span id="rruntxt">Recognise</span><svg id="rrunico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+      </div>
+      <div class="need" id="need" hidden>
+        <span>This report's PDF is not in the <code>doc/</code> folder. Add it there, or choose it here — it is checked against the detection and saved to <code>doc/</code>.</span>
+        <button id="rpick">Choose the file</button>
+      </div>
+      <input type="file" id="rpdf" accept="application/pdf,.pdf,image/jpeg,image/png,.jpg,.jpeg,.png" class="vh" tabindex="-1" aria-hidden="true">
+      <div class="prog" id="rprog" hidden>
+        <div class="bar"><i id="rbar"></i></div>
+        <div class="prog-txt"><span id="rptxt"></span><span id="rpeta"></span></div>
+      </div>
+      <div class="kpis" id="kpis" hidden>
+        <div class="kpi" style="--kc:#94a3b8"><span>Tables read</span><b id="k-t">0</b></div>
+        <div class="kpi" style="--kc:#2dd4bf"><span>Table Transformer</span><b id="k-tf">0</b></div>
+        <div class="kpi" style="--kc:#a78bfa"><span>PaddleOCR-VL</span><b id="k-vl">0</b></div>
+        <div class="kpi" style="--kc:#22d3ee"><span>Charts</span><b id="k-r">0</b></div>
+        <div class="kpi" style="--kc:#fb7185"><span>Failed</span><b id="k-f">0</b></div>
+      </div>
+    </div>
+
+    <div class="work">
+      <div class="glass viewer">
+        <div class="tool">
+          <h3><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a5b4fc" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 8h6v5H7z"/></svg>Bounding boxes</h3>
+          <span class="sp"></span>
+          <div class="seg" id="filter"><button data-v="all" class="on">All pages</button><button data-v="only">Tables + chart only</button></div>
+          <div style="flex-basis:100%;height:0"></div>
+          <span style="font-size:12px;color:var(--muted);font-weight:600">Layers</span>
+          <div class="layers">
+            <button class="layer" data-l="tbl" aria-pressed="true" style="--lc:#14b8a6"><i></i>Tables</button>
+            <button class="layer" data-l="para" aria-pressed="true" style="--lc:#8b5cf6"><i></i>Paragraphs</button>
+            <button class="layer" data-l="list" aria-pressed="true" style="--lc:#6366f1"><i></i>List items</button>
+            <button class="layer" data-l="head" aria-pressed="true" style="--lc:#ec4899"><i></i>Headings</button>
+            <button class="layer" data-l="pic" aria-pressed="true" style="--lc:#f97316"><i></i>Pictures</button>
+            <button class="layer" data-l="chart" aria-pressed="true" style="--lc:#a3e635"><i></i>Charts</button>
+            <button class="layer" data-l="cap" aria-pressed="true" style="--lc:#22d3ee"><i></i>Captions &amp; footnotes</button>
+            <button class="layer" data-l="hf" aria-pressed="true" style="--lc:#64748b"><i></i>Page header / footer</button>
+            <button class="layer" data-l="txt" aria-pressed="true" style="--lc:#eab308"><i></i>Other text</button>
+            <button class="layer" data-l="rej" aria-pressed="false" style="--lc:#f59e0b"><i></i>Rejected</button>
+            <button class="layer" data-l="cel" aria-pressed="true" style="--lc:#0ea5e9" id="layer-cel" hidden><i></i>Cells</button>
+          </div>
+        </div>
+        <div class="pages hide-rej" id="pages"></div>
+      </div>
+
+      <aside class="glass jsonp insp">
+        <div class="jh">
+          <div class="seg itabs" id="itabs" role="tablist">
+            <button data-v="rec" class="on" role="tab">Recognition <span class="badge" id="b-rec">0</span></button>
+            <button data-v="log" role="tab">Pipeline log <span class="badge" id="b-log">0</span></button>
+            <button data-v="json" role="tab">JSON</button>
+          </div>
+        </div>
+
+        <section class="iview" id="v-rec">
+          <div class="ih"><b id="rec-title">Recognition</b><span id="rec-sub"></span></div>
+          <div class="rbody" id="recbody"></div>
+        </section>
+
+        <section class="iview" id="v-log" hidden>
+          <div class="logp" id="logp">
+            <div class="log-h">
+              <span class="live" id="live"><i></i><span id="livetxt">Idle</span></span><b>Pipeline log</b>
+              <span class="log-n" id="logn">0 events</span>
+              <button class="ibtn sm" id="logcopy" title="Copy log" aria-label="Copy log"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg></button>
+            </div>
+            <div class="meter" id="meter" title="Time spent per stage (sum of step durations)"></div>
+            <div class="lfilter" id="lfilter">
+              <button data-v="" class="on">All</button>
+              <button data-v="render" style="--mc:#38bdf8"><i></i>Render</button>
+              <button data-v="model" style="--mc:#a78bfa"><i></i>Table Transformer · models</button>
+              <button data-v="check" style="--mc:#f472b6"><i></i>Layout</button>
+              <button data-v="structure" style="--mc:#2dd4bf"><i></i>Table structure</button>
+              <button data-v="vlm" style="--mc:#c084fc"><i></i>PaddleOCR-VL</button>
+              <button data-v="err" style="--mc:#fb7185"><i></i>Warnings &amp; errors</button>
+            </div>
+            <div class="log" id="log" role="log"></div>
+          </div>
+        </section>
+
+        <section class="iview" id="v-json" hidden>
+          <div class="ih">
+            <div class="seg" id="tabs"><button data-v="page" class="on" id="tab-page">Page</button><button data-v="full">Full response</button><button data-v="struct" id="tab-struct" hidden>Recognition</button></div>
+            <button class="ibtn" id="copy" title="Copy JSON" aria-label="Copy JSON" style="margin-left:auto"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg></button>
+            <button class="ibtn" id="dl" title="Download JSON" aria-label="Download JSON"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12m0 0l-5-5m5 5l5-5M4 20h16"/></svg></button>
+          </div>
+          <div class="jbody" id="json"><span class="j-dim">// waiting for results…</span></div>
+          <div class="jf"><span id="jinfo">–</span><span>bbox = [x, y, w, h] px</span></div>
+        </section>
+      </aside>
+    </div>
+  </section>
+</div>
+<div id="tip"></div>
+<div id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pct = x => (x * 100).toFixed(1) + '%';
+const kind = d => d.is_table === true ? 'ok' : d.is_table === false ? 'rej' : 'unv';
+const KIND = {ok: 'Verified table', unv: 'Model only · no text layer', rej: 'Rejected · not rows × columns'};
+const textClass = label => ({paragraph: 'para', 'list item': 'list', heading: 'head', title: 'head', picture: 'pic', chart: 'chart',
+  caption: 'cap', footnote: 'cap', 'page header': 'hf', 'page footer': 'hf'})[label] || 'txt';
+let file = null, dpi = 150, S = null, active = null, sel = null, tab = 'page', t0 = 0, scrollT = 0;
+
+function toast(msg, err) {
+  const t = $('#toast'); t.textContent = msg; t.className = 'on' + (err ? ' err' : '');
+  clearTimeout(t._h); t._h = setTimeout(() => t.className = '', 4200);
+}
+function segment(el, fn) {
+  el.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    el.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); fn(b.dataset.v);
+  });
+}
+
+/* ---------- upload ---------- */
+const dz = $('#drop'), inp = $('#file');
+dz.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inp.click(); } };
+inp.onchange = () => setFile(inp.files[0]);
+['dragover', 'drop'].forEach(t => window.addEventListener(t, e => e.preventDefault()));
+['dragenter', 'dragover'].forEach(t => dz.addEventListener(t, () => dz.classList.add('over')));
+['dragleave', 'drop'].forEach(t => dz.addEventListener(t, () => dz.classList.remove('over')));
+dz.addEventListener('drop', e => setFile(e.dataTransfer.files[0]));
+function setFile(f) {
+  if (!f) return;
+  if (/\.json$/i.test(f.name)) return openResult(f);
+  if (!/\.(pdf|jpe?g|png)$/i.test(f.name)) return toast('Please choose a PDF, JPG or PNG file', true);
+  file = f; $('#fname').textContent = f.name;
+  $('#fsize').textContent = f.size > 1048576 ? (f.size / 1048576).toFixed(1) + ' MB' : Math.ceil(f.size / 1024) + ' KB';
+  $('#pill').hidden = false; dz.hidden = true; $('#run').disabled = false;
+}
+$('#clear').onclick = () => { file = null; inp.value = ''; $('#pill').hidden = true; dz.hidden = false; $('#run').disabled = true; };
+const ju = $('#jsonup'), jinp = $('#jfile');
+ju.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); jinp.click(); } };
+jinp.onchange = () => { openResult(jinp.files[0]); jinp.value = ''; };
+['dragenter', 'dragover'].forEach(t => ju.addEventListener(t, () => ju.classList.add('over')));
+['dragleave', 'drop'].forEach(t => ju.addEventListener(t, () => ju.classList.remove('over')));
+ju.addEventListener('drop', e => openResult(e.dataTransfer.files[0]));
+const th = $('#th');
+th.oninput = () => { $('#thv').textContent = (+th.value).toFixed(2); th.style.setProperty('--p', (th.value - th.min) / (th.max - th.min) * 100 + '%'); };
+th.oninput();
+segment($('#dpi'), v => dpi = +v);
+segment($('#filter'), v => $('#pages').classList.toggle('only', v === 'only'));
+$$('.layer').forEach(b => b.onclick = () => {
+  const on = b.getAttribute('aria-pressed') !== 'true';
+  b.setAttribute('aria-pressed', on); $('#pages').classList.toggle('hide-' + b.dataset.l, !on);
+});
+segment($('#tabs'), v => { tab = v; renderJSON(); });
+
+/* ---------- inspector (right side): recognition | pipeline log | JSON ---------- */
+let itab = 'rec';
+function showView(v) {
+  itab = v;
+  $$('#itabs button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  ['rec', 'log', 'json'].forEach(k => $('#v-' + k).hidden = k !== v);
+  if (v === 'rec') renderRec();
+  if (v === 'json') renderJSON();
+  if (v === 'log') $('#log').scrollTop = $('#log').scrollHeight;
+}
+segment($('#itabs'), showView);
+
+/* ---------- pipeline log: every step of detection and recognition, per stage ---------- */
+const ICON = {info: '›', ok: '✓', warn: '!', err: '✕'};
+const STAGES = {render: ['Render', '#38bdf8'], model: ['Table Transformer · models', '#a78bfa'], check: ['Layout', '#f472b6'],
+  structure: ['Table structure', '#2dd4bf'], vlm: ['PaddleOCR-VL', '#c084fc']};
+let logCount = 0, logPage = null, stageT = {};
+function addLog(e) {
+  const box = $('#log'), stick = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+  const s = (performance.now() - t0) / 1000, el = document.createElement('div');
+  const level = e.level || 'info';
+  el.className = `le ${level} s-${e.stage || 'none'}${e.stage && level === 'info' ? ' stage-' + e.stage : ''}${e.tag ? ' tag-' + e.tag : ''}${e.page && e.page !== logPage ? ' first' : ''}`;
+  logPage = e.page || logPage;
+  el.innerHTML = `<span class="t">${String(Math.floor(s / 60)).padStart(2, '0')}:${(s % 60).toFixed(2).padStart(5, '0')}</span>`
+    + `<span class="pg">${e.page ? 'p' + e.page : ''}</span><span class="ic">${ICON[level]}</span>`
+    + `<span class="m">${esc(e.msg)}</span><span class="d">${e.dur != null ? e.dur.toFixed(2) + 's' : ''}</span>`;
+  box.append(el);
+  while (box.childElementCount > 1500) box.firstChild.remove();  // keep the DOM light on 500-page reports
+  if (stick) box.scrollTop = box.scrollHeight;  // follow the tail unless the user scrolled up to read
+  $('#logn').textContent = `${++logCount} events`; $('#b-log').textContent = logCount;
+  $('#plast').textContent = e.msg; $('#plast').className = 'plast ' + level;
+  if (e.stage && e.dur != null) { const t = stageT[e.stage] ??= {n: 0, s: 0}; t.n++; t.s += e.dur; meter(); }
+  if (e.stage) $$('.step').forEach(x => x.classList.toggle('on', x.dataset.stage === e.stage));
+}
+function logPhase(title) {  // a divider between detection and each recognition run
+  const el = document.createElement('div'); el.className = 'le phase'; el.textContent = title; $('#log').append(el);
+}
+function meter() {
+  $('#meter').innerHTML = Object.entries(STAGES).filter(([k]) => stageT[k]).map(([k, [name, c]]) =>
+    `<span style="--mc:${c}"><b>${name}</b>${stageT[k].n} step${stageT[k].n === 1 ? '' : 's'} · ${stageT[k].s.toFixed(1)} s</span>`).join('');
+}
+function liveState(state) {  // on | done | err
+  $('#live').className = 'live' + (state === 'on' ? ' on' : state === 'err' ? ' err' : '');
+  $('#livetxt').textContent = {on: 'Live', done: 'Done', err: 'Error'}[state];
+  if (state !== 'on') $$('.step').forEach(x => x.classList.remove('on'));
+}
+segment($('#lfilter'), v => $('#log').dataset.f = v);
+$('#logcopy').onclick = () => navigator.clipboard.writeText($$('#log .le').map(l => l.innerText.replace(/\n/g, ' ')).join('\n'))
+  .then(() => toast('Log copied'), () => toast('Clipboard blocked by browser', true));
+
+// poll short requests rather than read one long stream: antivirus web filters buffer a long
+// response until it ends, which would freeze the live log
+async function follow(job, on) {
+  for (let since = 0; ;) {
+    const r = await fetch(`/events/${job}?since=${since}`);
+    if (!r.ok) throw new Error('Lost the job — the server may have restarted.');
+    const {events, next, done} = await r.json();
+    events.forEach(on); since = next;
+    if (done && !events.length) break;
+    if (!events.length) await new Promise(ok => setTimeout(ok, 400));
+  }
+}
+const failMsg = e => e.message === 'Failed to fetch' ? 'Server not reachable — is app.py running?' : e.message;
+
+/* ---------- run ---------- */
+function busy(on) {
+  const r = $('#run'); r.disabled = on; r.classList.toggle('busy', on);
+  $('#runtxt').textContent = on ? 'Analyzing…' : 'Detect tables';
+  $('#runico').outerHTML = on ? '<span class="spin" id="runico"></span>'
+    : '<svg id="runico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+}
+$('#run').onclick = async () => {
+  if (!file) return;
+  S = newState({file: file.name, threshold: +th.value, dpi});
+  clearResults();
+  $('#prog').hidden = false; $('#bar').style.width = '0'; $('#ptxt').textContent = 'Uploading & loading model…'; $('#peta').textContent = '';
+  busy(true); t0 = performance.now();
+  $('#log').innerHTML = ''; logCount = 0; logPage = null; stageT = {}; meter(); liveState('on');
+  logPhase('Detection'); showView('log');
+  addLog({msg: `Uploading ${file.name} (${$('#fsize').textContent}) · threshold ${(+th.value).toFixed(2)} · ${dpi} dpi`});
+  const fd = new FormData(); fd.append('file', file); fd.append('threshold', th.value); fd.append('dpi', dpi);
+  try {
+    const res = await fetch('/detect', {method: 'POST', body: fd});
+    if (!res.ok) { let m = res.statusText; try { m = (await res.json()).detail; } catch {} throw new Error(m); }
+    await follow((await res.json()).job, handle);
+    if (!S.summary) throw new Error('Detection ended early — check the server console.');
+    liveState('done');
+    toast('Detection done — choose what to recognise and click Recognise');
+  } catch (e) {
+    const msg = failMsg(e);
+    $('#ptxt').textContent = 'Failed'; toast(msg, true);
+    if (!$$('#log .le.err').length) addLog({level: 'err', msg});  // server-side errors arrive already logged
+    liveState('err');
+  } finally { busy(false); }
+};
+
+const newState = o => ({model: null, summary: null, pages: [], total: 0, threshold: 0.5, ...o,
+  rec: {tables: new Map(), regions: new Map(), joined: []}});  // recognition results, keyed "page:id"; joined_tables
+function clearResults() {  // before a new result: drop the old pages and any loaded recognition
+  active = sel = null; $('#pages').innerHTML = ''; $('#map').innerHTML = ''; $('#banner').hidden = true;
+  $('#layer-cel').hidden = $('#tab-struct').hidden = true; $('#rec').hidden = true;
+  $('#rprog').hidden = $('#kpis').hidden = $('#need').hidden = true; rstate('not started');
+  if (tab === 'struct') $('#tabs button[data-v="page"]').click();
+  updRec(); renderRec();
+}
+
+/* ---------- recognise: Table Transformer / PaddleOCR-VL on a finished detection ---------- */
+let rmode = 'tables', rscope = 'all', R = null, rpdf = null;
+$('#rmode').addEventListener('click', e => {
+  const b = e.target.closest('.opt'); if (!b || b.disabled) return;
+  rmode = b.dataset.v;
+  $$('#rmode .opt').forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-checked', x === b); });
+  updRec();
+});
+segment($('#rscope'), v => { rscope = v; updRec(); });
+const isChart = b => b.label === 'chart';  // both modes read these (PaddleOCR-VL) besides the tables
+const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+function counts(ps) {  // [tables, charts, other regions (text from the PDF text layer, pictures read from their image)]
+  const n = f => ps.reduce((a, p) => a + p.text_blocks.filter(f).length, 0);
+  return [ps.reduce((a, p) => a + p.detections.filter(d => d.is_table).length, 0), n(isChart), n(b => !isChart(b))];
+}
+function work() {  // what one click would read with the current options: [tables, charts, other regions]
+  const [t, c, x] = counts(!S ? [] : rscope === 'page' ? S.pages.filter(p => p.page === active) : S.pages);
+  return [t, c, rmode === 'all' ? x : 0];
+}
+function updRec() {
+  if (!S?.pages.length) return;
+  const [all, charts, other] = counts(S.pages);
+  $('#est-tables').textContent = `${plural(all, 'table')} + ${plural(charts, 'chart')} in this document`;
+  $('#est-all').textContent = `${plural(all, 'table')} + ${plural(charts, 'chart')} + ${plural(other, 'text region')}`;
+  $('#rscope-page').textContent = active ? `Page ${active}` : 'Current page';
+  if (R?.running) return;
+  const [t, c, x] = work();
+  $('#rruntxt').textContent = !t && !c && !x ? 'Nothing to recognise here'
+    : `Recognise ${plural(t, 'table')}` + (c ? ` + ${plural(c, 'chart')}` : '') + (x ? ` + ${plural(x, 'text region')}` : '');
+  $('#rrun').disabled = !t && !c && !x;
+}
+function rstate(s, cls = '') { const c = $('#rstate'); c.textContent = s; c.className = 'chip ' + cls; }
+function rbusy(on) {
+  const r = $('#rrun'); r.disabled = on; r.classList.toggle('busy', on);
+  $$('#rmode .opt, #rscope button').forEach(b => b.disabled = on);
+  $('#rrunico').outerHTML = on ? '<span class="spin" id="rrunico"></span>'
+    : '<svg id="rrunico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+  if (on) $('#rruntxt').textContent = 'Recognising…'; else updRec();
+}
+$('#rrun').onclick = () => recognise();
+$('#rpick').onclick = () => $('#rpdf').click();
+$('#rpdf').onchange = () => { const f = $('#rpdf').files[0]; $('#rpdf').value = ''; if (f) { rpdf = f; recognise(); } };
+async function recognise() {
+  if (!S?.summary || R?.running) return;
+  const fd = new FormData(); fd.append('name', S.file); fd.append('mode', rmode);
+  if (rscope === 'page') fd.append('pages', String(active));
+  if (rpdf) fd.append('file', rpdf);
+  R = {running: true, n: 0, total: 0, t: 0, tf: 0, vl: 0, r: 0, f: 0, start: performance.now()};
+  $('#need').hidden = true; rbusy(true); rstate('running', 'run-on'); liveState('on');
+  $('#rprog').hidden = $('#kpis').hidden = false; $('#rbar').style.width = '0'; $('#rpeta').textContent = '';
+  $('#rptxt').textContent = 'Loading recognition models…'; kpis();
+  logPhase(`Recognition · ${rmode === 'tables' ? 'tables + charts' : 'text + tables + charts'} · ${rscope === 'page' ? 'page ' + active : 'all pages'}`);
+  showView('rec');
+  try {
+    const res = await fetch('/recognise', {method: 'POST', body: fd});
+    if (res.status === 409) {  // a result saved before the server kept PDFs: ask for it once
+      $('#need').hidden = false; rstate('needs the PDF', 'rej'); liveState('done'); $('#rprog').hidden = true;
+      return;
+    }
+    if (!res.ok) { let m = res.statusText; try { m = (await res.json()).detail; } catch {} throw new Error(m); }
+    rpdf = null;
+    await follow((await res.json()).job, handleRec);
+    if (!R.done) throw new Error('Recognition ended early — check the server console.');
+    liveState('done');
+  } catch (e) {
+    const msg = failMsg(e); toast(msg, true); addLog({level: 'err', msg}); rstate('error', 'rej'); liveState('err');
+    $('#rptxt').textContent = 'Failed';
+  } finally { R.running = false; rbusy(false); }
+}
+function handleRec(m) {
+  if (m.type === 'log') return addLog(m);
+  if (m.type === 'error') throw new Error(m.detail);
+  if (m.type === 'rmeta') { R.total = m.total; $('#rptxt').textContent = `0 / ${m.total} · ${m.tables} table(s)` + (m.regions ? ` + ${m.regions} region(s)` : ''); }
+  else if (m.type === 'table') { const {type, ...t} = m; addTable(t); R.t++; t.engine === VLM ? R.vl++ : R.tf++; kpis(); }
+  else if (m.type === 'region') { const {type, ...b} = m; addRegion(b); R.r++; kpis(); }
+  else if (m.type === 'regions') { m.items.forEach(b => addRegion(b, false)); recChanged(m.page); }  // a page's text regions at once: one re-render
+  else if (m.type === 'joined') { S.rec.joined = m.tables; recChanged(active); }  // tables continued over pages
+  else if (m.type === 'progress') {
+    R.n = m.n; R.f = R.n - R.t - R.r; kpis();
+    const el = (performance.now() - R.start) / 1000;
+    $('#rbar').style.width = m.n / m.total * 100 + '%';
+    $('#rptxt').textContent = `${m.n} / ${m.total} · ${(el / m.n).toFixed(1)} s each`;
+    $('#rpeta').textContent = m.n < m.total ? `~${fmtS(el / m.n * (m.total - m.n))} left` : '';
+  } else if (m.type === 'rsummary') {
+    R.done = true;
+    rstate(m.failed ? `done · ${m.failed} failed` : 'done', m.failed ? 'rej' : 'ok');
+    $('#rptxt').textContent = `Done · ${m.tables} table(s) · ${m.regions} region(s) in ${fmtS(m.seconds)}`;
+    toast(`Recognised ${m.tables} table(s)` + (m.regions ? ` and ${m.regions} region(s)` : '') + ` · saved to output/`);
+  }
+}
+const fmtS = s => s < 90 ? Math.round(s) + ' s' : s < 5400 ? Math.round(s / 60) + ' min' : (s / 3600).toFixed(1) + ' h';
+function kpis() { $('#k-t').textContent = R.t; $('#k-tf').textContent = R.tf; $('#k-vl').textContent = R.vl; $('#k-r').textContent = R.r; $('#k-f').textContent = R.f; }
+const VLM = 'PaddleOCR-VL-1.6';
+
+/* ---------- re-open a saved result: output/<name>/table/<name>_tables.json (or "Download JSON") / structure/<name>_structure.json ---------- */
+async function openResult(f) {
+  if (!f) return;
+  let r;
+  try { r = JSON.parse(await f.text()); } catch { return toast('Not a valid JSON file', true); }
+  try {
+    if (Array.isArray(r?.tables)) return await openStructure(r);
+    if (!Array.isArray(r?.pages) || !r.summary) return toast('Not a TableLens result — expected a _tables.json or _structure.json', true);
+    showResult(r);
+    toast(`Opened ${f.name} · ${r.pages.length} page(s)`);
+  } catch (e) { toast('Could not show this result: ' + e.message, true); }
+}
+function showResult(r) {  // replay it through the live handler: same rendering as a fresh run
+  S = newState({file: r.file, model: r.model, threshold: r.threshold ?? 0.5, dpi: r.dpi});
+  clearResults(); $('#prog').hidden = true; t0 = performance.now();
+  handle({type: 'meta', file: r.file, model: r.model, pages: r.summary.total_pages ?? r.pages.length});
+  for (const p of r.pages) handle({...p, type: 'page', image: p.image_file ? '/output/' + p.image_file : ''});
+  handle({...r.summary, type: 'summary'});
+}
+
+/* ---------- recognition results (live events, or a re-opened output/<name>/structure/<name>_structure.json) ---------- */
+async function openStructure(r) {
+  if (S?.file !== r.file) {  // page images and table boxes come from the matching _tables.json
+    const res = await fetch('/output/' + encodeURI(r.tables_json ?? ''));  // <stem>/table/<stem>_tables.json
+    if (!res.ok) return toast(`Open ${r.tables_json ?? 'the matching _tables.json'} first — it has the page images`, true);
+    showResult(await res.json());
+  }
+  S.rec.joined = r.joined_tables ?? [];
+  r.tables.forEach(t => addTable({engine: r.model, ...t}));
+  (r.regions ?? []).forEach(b => addRegion(b, false));
+  if (r.regions?.length) recChanged(active);  // one re-render, not one per region
+  const bad = r.tables.filter(t => !t.complete).length;
+  toast(`${r.tables.length} recognised table(s)` + (r.regions?.length ? ` · ${r.regions.length} region(s)` : '') + (bad ? ` · ${bad} cut off` : ''), bad > 0);
+  const first = r.tables[0]?.page ?? r.regions?.[0]?.page, card = $('#page-' + first);
+  clearTimeout(scrollT);  // a just-loaded _tables.json would otherwise scroll back up to the results top
+  if (card) { if (card.offsetParent === null) $('#filter button[data-v="all"]').click(); card.scrollIntoView({behavior: 'smooth', block: 'start'}); setActive(first, true); }
+  showView('rec');
+}
+function addTable(t) {  // store + cell boxes on the page; the grid itself is shown on the right (renderRec)
+  const key = `${t.page}:${t.table_id}`, p = S.pages.find(x => x.page === t.page), card = $('#page-' + t.page);
+  S.rec.tables.set(key, t);
+  if (p && card) {
+    $$(`.box.cel[data-key^="${t.page}:c${t.table_id}-"], .chip.sx[data-t="${key}"]`).forEach(x => x.remove());
+    // cell boxes are PDF points; the page image is the page rendered at S.dpi
+    // ponytail: unrotated pages only (bbox_pdf_pt is unrotated PDF space), map through the rotation if rotated tables show up
+    const k = S.dpi / 72, fig = card.querySelector('.fig');
+    t.cells.forEach((c, i) => {
+      if (!c.bbox_pdf_pt) return;
+      const [l, tp, r, b] = c.bbox_pdf_pt;
+      addBox(fig, p, {...c, bbox: [l * k, tp * k, (r - l) * k, (b - tp) * k]}, 'cel' + (c.column_header ? ' hdr' : ''),
+        `c${t.table_id}-${i}`, '', `cell row ${c.row} column ${c.col}`).onclick = e => { e.stopPropagation(); focusRec(t.page, 'rc', t.table_id, `${t.page}:c${t.table_id}-${i}`); };
+    });
+    card.querySelector('.chips').insertAdjacentHTML('beforeend', `<span class="chip ${t.complete ? 'unv' : 'rej'} sx" data-t="${key}">#${t.table_id} `
+      + (t.complete ? `${t.num_rows}×${t.num_cols} · ${engName(t).split('-')[0]}` : 'cut off') + '</span>');
+    $(`.cell[data-p="${t.page}"]`)?.classList.add('rc');
+    if (t.cells.some(c => c.bbox_pdf_pt)) $('#layer-cel').hidden = false;
+  }
+  recChanged(t.page);
+}
+function addRegion(b, render = true) {
+  S.rec.regions.set(`${b.page}:${b.id}`, b);
+  const tb = S.pages.find(x => x.page === b.page)?.text_blocks.find(x => x.id === b.id);
+  if (tb) Object.assign(tb, {text: b.text, words: b.words, read_by: b.read_by, figure_class: b.figure_class, figure_score: b.figure_score});
+  $(`.cell[data-p="${b.page}"]`)?.classList.add('rc');
+  if (render) recChanged(b.page);
+}
+function recChanged(page) {
+  $('#b-rec').textContent = S.rec.tables.size + S.rec.regions.size;
+  $('#tab-struct').hidden = false;
+  if (page === active) { if (itab === 'rec') renderRec(); else if (itab === 'json' && tab === 'struct') renderJSON(); }
+}
+const engName = t => { const n = (t.engine ?? 'TableFormerV2').split(/[\\/]/).pop().split(' ')[0];
+  return n.startsWith('table-transformer') ? 'Table Transformer ' + n.split('-').slice(-2).join('-') : n; };
+function focusRec(page, prefix, id, cellKey) {  // a click on the page: show that table / region on the right
+  setActive(page, true); showView('rec');
+  const el = $(`#${prefix}-${page}-${id}`); if (!el) return;
+  el.scrollIntoView({block: 'start', behavior: 'smooth'}); el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+  if (cellKey) { const c = el.querySelector(`[data-key="${cellKey}"]`); c?.scrollIntoView({block: 'nearest', inline: 'center', behavior: 'smooth'}); hl(c, true); setTimeout(() => hl(c, false), 1600); }
+}
+function grid(t) {  // [html, tsv]: each cell at its start position with its spans; positions a span covers render nothing
+  const own = Array.from({length: t.num_rows}, () => Array(t.num_cols).fill(null));
+  t.cells.forEach((c, i) => {
+    for (let r = c.row; r < c.row + c.row_span; r++)
+      for (let q = c.col; q < c.col + c.col_span; q++) if (own[r]?.[q] === null) own[r][q] = r === c.row && q === c.col ? i : -1;
+  });
+  const html = own.map(row => '<tr>' + row.map(i => {
+    if (i === -1) return '';
+    if (i === null) return '<td></td>';
+    const c = t.cells[i], tag = c.column_header ? 'th' : 'td', cls = c.row_section ? 'sec' : c.row_header ? 'rh' : '';
+    const k = c.index != null ? `${c.page}:c${c.table_id}-${c.index}` : `${t.page}:c${t.table_id}-${i}`;  // a joined cell: its part's
+    return `<${tag} data-key="${k}"${cls ? ` class="${cls}"` : ''}${c.row_span > 1 ? ` rowspan="${c.row_span}"` : ''}`
+      + `${c.col_span > 1 ? ` colspan="${c.col_span}"` : ''}>${esc(c.text ?? '')}</${tag}>`;
+  }).join('') + '</tr>').join('');
+  const tsv = own.map(row => row.map(i => i >= 0 && i !== null ? (t.cells[i].text ?? '').replace(/\s+/g, ' ') : '').join('\t')).join('\n');
+  return [html, tsv];
+}
+// a table's title / subtitle: the heading (+ short line) right before it in reading order (detection: table_titles)
+const tableTitle = d => d.title ? `<div class="ttl"><b>${esc(d.title)}</b>${d.subtitle ? `<span>${esc(d.subtitle)}</span>` : ''}</div>` : '';
+// a table printed over several pages (joined_tables): its first part shows it whole, the other parts point there
+const joinOf = t => S.rec.joined?.find(j => j.parts.some(x => x.page === t.page && x.table_id === t.table_id));
+const isLead = (j, t) => j?.parts[0].page === t.page && j.parts[0].table_id === t.table_id;
+const whole = t => { const j = t && joinOf(t); return isLead(j, t) ? {...t, ...j, title: t.title, subtitle: t.subtitle} : t; };
+function tableCard(page, d, t) {
+  if (!t) return `<article class="rcard pending" id="rc-${page}-${d.id}">${tableTitle(d)}<header><b>Table #${d.id}</b><span class="eng none">not recognised yet</span></header>`
+    + `<p class="rnote">Choose <b>Tables + Chart only</b> or <b>Text + Tables + Chart</b> above and click <b>Recognise</b> to read its rows, columns and cells.</p></article>`;
+  const j = joinOf(t), part = t;
+  t = whole(t);
+  const vl = engName(t).startsWith('PaddleOCR'), o = t.orientation, [html] = grid(t);
+  const why = t.route ?? '';
+  const pages = j ? j.parts.map(x => x.page).filter((v, i, a) => a.indexOf(v) === i) : [];
+  return `<article class="rcard" id="rc-${page}-${t.table_id}">${tableTitle(d)}<header><b>Table #${t.table_id}</b>`
+    + (!j ? '' : isLead(j, part) ? `<span class="chip ok" title="This table goes on over the next page(s); shown here joined">joined · pages ${pages.join(' + ')}</span>`
+       : `<span class="chip" title="The rest of the table that starts on page ${j.parts[0].page}; the whole table is shown there">continued from p. ${j.parts[0].page} · shown whole there</span>`)
+    + (t.complete ? '' : '<span class="chip rej">cut off — unreliable</span>') + `<span class="eng ${vl ? 'vl' : 'tf'}">${esc(engName(t))}</span></header>`
+    + (why ? `<div class="route"><i>${vl ? '↪' : '✓'}</i><span>${vl ? 'Sent to PaddleOCR-VL: ' : ''}${esc(why)}</span></div>` : '')
+    + `<div class="rmeta"><span>${t.num_rows} rows × ${t.num_cols} cols</span><span>${t.cells.length} cells</span>`
+    + `<span>${t.cells.filter(c => c.column_header).length} header cells</span><span>${t.seconds} s</span>`
+    + (o != null ? `<span title="how far the table is turned on the page: PDF text direction, or PP-LCNet_x1_0_doc_ori on a scan">orientation ${o.table ?? o}°</span>` : '')
+    + `</div><div class="sgrid"><table>${html}</table></div>`
+    + `<div class="ract"><button data-act="tsv" data-k="${page}:${t.table_id}">Copy as TSV</button><button data-act="locate" data-k="${page}:t${t.table_id}">Show on page</button></div></article>`;
+}
+function regionCard(b) {  // a chart: its data as a grid; anything else: its text, styled like on the page
+  const id = `rg-${b.page}-${b.id}`;
+  if (b.label !== 'chart') return `<div class="rx ${textClass(b.label)}" id="${id}" title="${esc(b.label)} #${b.id} · ${esc(b.read_by ?? '')}">`
+    + (b.label === 'picture' && b.text  // read from its image: a logo's / stamp's text, a table, a decoded QR code
+         ? (b.figure_class ? `<span class="rnote">[${esc(b.figure_class.replace(/_/g, ' '))}]</span> ` : '') + `<pre class="rtext">${esc(b.text)}</pre>`
+       : b.label === 'picture' ? `[picture${b.figure_class ? ' · ' + esc(b.figure_class.replace(/_/g, ' ')) : ''} — `
+         + (!b.read_by || b.read_by.startsWith('not read') ? 'not read]' : 'no text in it]')
+       : esc(b.text) || '<i>(no text layer)</i>') + '</div>';
+  const ct = b.chart_table;
+  const grid = ct?.num_rows ? '<tr>' + ct.header.map(h => `<th>${esc(h)}</th>`).join('') + '</tr>'
+    + ct.rows.map(r => '<tr>' + r.map(c => `<td>${esc(c)}</td>`).join('') + '</tr>').join('') : '';
+  return `<article class="rcard" id="${id}"><header><b>Chart #${b.id}</b>`
+    + (b.figure_class ? `<span class="chip chart">${esc(b.figure_class.replace(/_/g, ' '))} · ${pct(b.figure_score)}</span>` : '')
+    + ({verified: `<span class="chip ok" title="Every number in this table is printed in the chart (PDF text layer). A right number under the wrong label is not caught.">numbers ✓ in PDF</span>`,
+        unverified: `<span class="chip rej" title="PaddleOCR-VL gave numbers this chart does not print (PDF text layer): check this table against the page.">unverified · ${esc((b.check?.not_in_pdf ?? []).join(', '))} not in PDF</span>`,
+        'not checked': `<span class="chip" title="The chart is an image: its numbers are not in the PDF text layer, only PaddleOCR-VL read them.">not checked · image</span>`}[b.check?.status] ?? '')
+    + `<span class="eng vl">PaddleOCR-VL</span></header>`
+    + `<div class="rmeta">${ct ? `<span>${ct.num_rows} rows × ${ct.num_cols} cols</span>` : ''}`
+    + (b.crop_dpi ? `<span>${b.crop_dpi} dpi${b.reads > 1 ? ` · best of ${b.reads} reads` : ''}</span>` : '') + `<span>${b.seconds} s</span>`
+    + (b.complete === false ? '<span>cut off</span>' : '') + '</div>'
+    + (grid ? `<div class="sgrid"><table>${grid}</table></div>` : `<pre class="rtext">${esc(b.text || '(no chart data read)')}</pre>`) + '</article>';
+}
+function renderRec() {
+  const box = $('#recbody');
+  if (!S?.pages.length) {
+    $('#rec-title').textContent = 'Recognition'; $('#rec-sub').textContent = '';
+    box.innerHTML = '<div class="rempty"><b>Nothing here yet</b>Upload a PDF and detect its tables, then click <b>Recognise</b>. Each table\'s grid appears here, next to the page you are looking at.</div>';
+    return;
+  }
+  const p = S.pages.find(x => x.page === active); if (!p) return;
+  const dets = p.detections.filter(d => d.is_table), regs = [...S.rec.regions.values()].filter(b => b.page === p.page);
+  const done = dets.filter(d => S.rec.tables.has(`${p.page}:${d.id}`)).length, nc = regs.filter(isChart).length;
+  const unread = p.text_blocks.filter(b => isChart(b) && !S.rec.regions.has(`${p.page}:${b.id}`)).length;
+  $('#rec-title').textContent = `Page ${p.page}`;
+  $('#rec-sub').textContent = `${done} / ${dets.length} table(s) recognised` + (nc ? ` · ${plural(nc, 'chart')}` : '')
+    + (regs.length > nc ? ` · ${plural(regs.length - nc, 'text region')}` : '');
+  const top = box.scrollTop;
+  // in PDF reading order (the detection's "order": column by column); results detected before it: top to bottom.
+  // A table's title / subtitle blocks are shown on its card, not again as text.
+  const titled = new Set(dets.flatMap(d => [d.title_id, d.subtitle_id]).filter(Boolean));
+  const key = x => [x.order ?? Infinity, ...(x.bbox ?? [0, 0])];
+  const items = [...dets.map(d => [key(d), tableCard(p.page, d, S.rec.tables.get(`${p.page}:${d.id}`))]),
+                 ...regs.filter(b => !titled.has(b.id)).map(b => [key(b), regionCard(b)])]
+    .sort((a, b) => (a[0][0] - b[0][0]) || (a[0][2] - b[0][2]) || (a[0][1] - b[0][1]));
+  box.innerHTML = (items.map(x => x[1]).join('')
+    || '<div class="rempty"><b>Nothing recognised on this page</b>Scroll the pages on the left, or click a page in the page map — this panel follows.</div>')
+    + (unread ? `<p class="rnote" style="padding:0 4px">${plural(unread, 'chart')} on this page not read yet — choose <b>Tables + Chart only</b> or <b>Text + Tables + Chart</b>.</p>` : '');
+  box.scrollTop = top;
+}
+$('#recbody').addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const t = whole(S.rec.tables.get(b.dataset.k));
+  if (b.dataset.act === 'tsv') navigator.clipboard.writeText(grid(t)[1]).then(() => toast('Table copied as TSV — paste into Excel'), () => toast('Clipboard blocked by browser', true));
+  else { const box = $(`.box[data-key="${b.dataset.k}"]`); $$('.box.sel').forEach(x => x.classList.remove('sel')); box?.classList.add('sel'); box?.scrollIntoView({block: 'center', behavior: 'smooth'}); }
+});
+// hovering a cell on the page lights its grid cell on the right, and the other way round
+const hl = (x, on) => x && $$(`[data-key="${x.dataset.key}"]`).forEach(y => y.classList.toggle('hl', on));
+document.addEventListener('mouseover', e => hl(e.target.closest('.box.cel, .sgrid [data-key]'), true));
+document.addEventListener('mouseout', e => hl(e.target.closest('.box.cel, .sgrid [data-key]'), false));
+
+function handle(m) {
+  if (m.type === 'log') return addLog(m);
+  if (m.type === 'error') throw new Error(m.detail);
+  if (m.type === 'meta') {
+    S.model = m.model; S.total = m.pages; $('#results').hidden = false; $('#rfile').textContent = m.file;
+    $('#map').innerHTML = Array.from({length: m.pages}, (_, i) => `<button class="cell pending" data-p="${i + 1}" title="Page ${i + 1}">${i + 1}</button>`).join('');
+    stats(); scrollT = setTimeout(() => $('#results').scrollIntoView({behavior: 'smooth'}), 150);
+  } else if (m.type === 'page') {
+    const {type, image, ...p} = m; S.pages.push(p); renderPage(p, image); mapCell(p); stats();
+    const n = S.pages.length, el = (performance.now() - t0) / 1000;
+    $('#bar').style.width = n / S.total * 100 + '%';
+    $('#ptxt').textContent = `Page ${n} / ${S.total} · ${(el / n).toFixed(1)} s/page`;
+    $('#peta').textContent = n < S.total ? `~${Math.ceil(el / n * (S.total - n))} s left` : '';
+    if (active == null) setActive(p.page); else if (itab === 'json' && tab === 'full') renderJSON();
+  } else if (m.type === 'summary') {
+    const {type, ...s} = m; S.summary = s; stats(); renderJSON();
+    $('#ptxt').textContent = `Done · ${s.total_pages} pages in ${s.seconds} s`;
+    $('#rec').hidden = false; updRec(); renderRec();
+    const b = $('#banner'); b.hidden = false;
+    b.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg><span><b>${s.tables}</b> table${s.tables === 1 ? '' : 's'} on <b>${s.pages_with_tables}</b> of ${s.total_pages} pages · <b>${s.paragraphs}</b> paragraphs · ${s.seconds}s</span>`;
+  }
+}
+
+function stats() {
+  const dets = S.pages.flatMap(p => p.detections), n = S.pages.length;
+  const tables = dets.filter(d => d.is_table !== false).length, verified = dets.filter(d => d.is_table === true).length;
+  const pt = S.pages.filter(p => p.tables > 0).length, rej = dets.length - tables;
+  const model = dets.filter(d => d.tatr_score != null && d.tatr_score >= S.threshold);  // Table Transformer boxes
+  const layoutOnly = dets.filter(d => d.is_table && d.tatr_score == null).length;
+  const avg = model.length ? model.reduce((a, d) => a + d.tatr_score, 0) / model.length : null;
+  $('#s-pages').textContent = S.total; $('#s-pages-s').textContent = n < S.total ? `${n} analysed so far` : 'all analysed';
+  $('#s-pt').textContent = pt; $('#s-pt-s').textContent = n ? `${Math.round(pt / n * 100)}% of analysed pages` : '–';
+  $('#s-t').textContent = tables;
+  $('#s-t-s').textContent = tables ? `${tables - layoutOnly} confirmed by both models · ${layoutOnly} layout model only` : 'confirmed by the layout model';
+  $('#s-raw').textContent = model.length; $('#s-raw-s').textContent = `${avg == null ? 'none' : 'avg ' + pct(avg)} · threshold ${S.threshold.toFixed(2)}`;
+  $('#s-rej').textContent = rej;
+  const tb = S.pages.flatMap(p => p.text_blocks), count = l => tb.filter(b => b.label === l).length;
+  $('#s-para').textContent = count('paragraph');
+  $('#s-para-s').textContent = `+ ${count('heading') + count('title')} headings · ${count('list item')} list items · ${tb.length - count('paragraph') - count('heading') - count('title') - count('list item')} other`;
+}
+
+function mapCell(p) {
+  const c = $(`.cell[data-p="${p.page}"]`), rej = p.detections.some(d => d.is_table === false);
+  const charts = p.text_blocks.filter(b => b.label === 'chart').length;
+  c.className = 'cell ' + (p.tables >= 2 ? 't2' : p.tables === 1 ? 't1' : charts ? 'ch' : rej ? 'rj' : 'n0')
+    + (p.tables && charts ? ' hc' : '') + (p.page === active ? ' on' : '');
+  c.title = `Page ${p.page} · ${p.tables} table${p.tables === 1 ? '' : 's'}` + (charts ? ` · ${charts} chart${charts === 1 ? '' : 's'}` : '');
+}
+$('#map').onclick = e => {
+  const c = e.target.closest('.cell'); if (!c || c.classList.contains('pending')) return;
+  const card = $('#page-' + c.dataset.p);
+  if (card.offsetParent === null) { $('#filter button[data-v="all"]').click(); }
+  card.scrollIntoView({behavior: 'smooth', block: 'start'}); setActive(+c.dataset.p);
+};
+
+/* ---------- page viewer ---------- */
+const io = new IntersectionObserver(es => es.forEach(e => e.isIntersecting && setActive(+e.target.dataset.page)), {rootMargin: '-45% 0px -50% 0px'});
+function renderPage(p, img) {
+  const card = document.createElement('article');
+  card.className = 'page'; card.id = 'page-' + p.page; card.dataset.page = p.page; card.dataset.tables = p.tables;
+  card.dataset.charts = p.text_blocks.filter(isChart).length;  // "Tables + chart only" keeps pages with either
+  const rej = p.detections.filter(d => d.is_table === false).length, unv = p.detections.filter(d => d.is_table === null).length;
+  const byLabel = {};
+  p.text_blocks.forEach(t => byLabel[t.label] = (byLabel[t.label] || 0) + 1);
+  const chips = (p.tables ? `<span class="chip ok">${p.tables} table${p.tables > 1 ? 's' : ''}</span>` : '<span class="chip">No tables</span>')
+    + (unv ? `<span class="chip unv">${unv} model-only</span>` : '') + (rej ? `<span class="chip rej">${rej} rejected</span>` : '')
+    + Object.entries(byLabel).map(([l, n]) => `<span class="chip ${textClass(l)}">${n} ${esc(l)}</span>`).join('')
+    + (p.rotation ? `<span class="chip">page rotated ${p.rotation}°</span>` : '');
+  card.innerHTML = `<header class="page-head"><span class="pno">Page <b>${String(p.page).padStart(2, '0')}</b><i>/ ${S.total}</i></span><span class="chips">${chips}</span></header>
+    <div class="fig" style="aspect-ratio:${p.width}/${p.height}"><img alt="Page ${p.page}" src="${esc(img)}">${p.detections.length + p.text_blocks.length ? '' : '<span class="empty-pg">no text layer · no tables</span>'}</div>`;
+  const fig = card.querySelector('.fig'), im = fig.querySelector('img');
+  im.onerror = () => { im.hidden = true; fig.insertAdjacentHTML('beforeend', '<span class="empty-pg">page image not in output/ · boxes only</span>'); };
+  for (const t of p.text_blocks) addBox(fig, p, t, 'tb ' + textClass(t.label), 'p' + t.id, `${t.label} #${t.id}`, `${t.label} ${t.id}`);
+  for (const d of p.detections) {
+    const k = kind(d);
+    addBox(fig, p, d, k, 't' + d.id, `${k === 'rej' ? 'Rejected' : 'Table'} #${d.id} · ${pct(d.score)}`, `${KIND[k]} ${d.id}, ${pct(d.score)}`);
+  }
+  $('#pages').append(card); io.observe(card);
+}
+function addBox(fig, p, o, cls, key, tag, aria) {  // o.bbox = [x, y, w, h] in page pixels
+  const [x, y, w, h] = o.bbox, b = document.createElement('button');
+  b.className = `box ${cls}${y / p.height < 0.035 ? ' in' : ''}`; b.dataset.key = `${p.page}:${key}`;
+  b.style.cssText = `left:${x / p.width * 100}%;top:${y / p.height * 100}%;width:${w / p.width * 100}%;height:${h / p.height * 100}%`;
+  b.innerHTML = `<span class="tag">${tag}</span>`; b.setAttribute('aria-label', aria);
+  b.onmouseenter = e => showTip(e, o, cls); b.onmousemove = moveTip; b.onmouseleave = () => $('#tip').classList.remove('on');
+  b.onclick = () => select(p.page, key);
+  fig.append(b);
+  return b;
+}
+function showTip(e, o, cls) {
+  const row = (k, v) => `<div class="tip-r"><span>${k}</span><b>${v}</b></div>`, box = o.bbox.map(Math.round).join(', ');
+  if (o.row !== undefined) {  // recognised table cell
+    const kind = o.column_header ? 'column header' : o.row_header ? 'row header' : o.row_section ? 'section row' : 'cell';
+    $('#tip').innerHTML = `<div class="tip-h"><b>Row ${o.row} · Col ${o.col}</b><span class="chip ${o.column_header ? 'head' : 'unv'}">${kind}</span></div>`
+      + row('Span (rows × cols)', `${o.row_span} × ${o.col_span}`) + row('bbox PDF pt', o.bbox_pdf_pt.map(Math.round).join(', '))
+      + (o.text ? `<div class="tip-txt">${esc(o.text)}</div>` : '<p class="tip-why">empty cell</p>');
+  } else if (o.text !== undefined) {
+    $('#tip').innerHTML = `<div class="tip-h"><b>${esc(o.label[0].toUpperCase() + o.label.slice(1))} #${o.id}</b><span class="chip ${cls}">layout model</span></div>`
+      + row('Confidence', pct(o.score)) + row('Words', o.words)
+      + (o.read_by ? row('Read by', esc(o.read_by)) + (o.figure_class ? row('Picture class', `${esc(o.figure_class)} · ${pct(o.figure_score)}`) : '') : '')
+      + row('bbox [x,y,w,h]', box) + (o.text ? `<div class="tip-txt">${esc(o.text.length > 260 ? o.text.slice(0, 260) + '…' : o.text)}</div>` : '');
+  } else {
+    const sc = v => v == null ? '— (no box)' : pct(v);
+    $('#tip').innerHTML = `<div class="tip-h"><b>Table #${o.id}</b><span class="chip ${cls}">${KIND[cls].split(' · ')[0]}</span></div>`
+      + row('Confidence (combined)', pct(o.score)) + row('Layout model', sc(o.layout_score)) + row('Table Transformer', sc(o.tatr_score))
+      + row('bbox [x,y,w,h]', box) + (o.bbox_model ? row('Table Transformer bbox', o.bbox_model.map(Math.round).join(', ')) : '')
+      + `<p class="tip-why">${esc(o.reason)}</p>`;
+  }
+  $('#tip').classList.add('on'); moveTip(e);
+}
+function moveTip(e) {
+  const t = $('#tip'), r = t.getBoundingClientRect();
+  let x = e.clientX + 16, y = e.clientY + 16;
+  if (x + r.width > innerWidth - 8) x = e.clientX - r.width - 16;
+  if (y + r.height > innerHeight - 8) y = e.clientY - r.height - 16;
+  t.style.transform = `translate(${Math.max(8, x)}px,${Math.max(8, y)}px)`;
+}
+function select(page, key) {  // a box on the page: its recognition on the right if there is one, else its JSON
+  $$('.box.sel').forEach(b => b.classList.remove('sel'));
+  $(`.box[data-key="${page}:${key}"]`)?.classList.add('sel');
+  sel = {page, key};
+  const id = +key.slice(1);
+  if (key[0] === 't' && S.rec.tables.has(`${page}:${id}`)) return focusRec(page, 'rc', id);
+  if (key[0] === 'p' && S.rec.regions.has(`${page}:${id}`)) {  // a table's title / subtitle is shown on its card
+    const owner = S.pages.find(x => x.page === page)?.detections.find(d => d.title_id === id || d.subtitle_id === id);
+    return owner ? focusRec(page, 'rc', owner.id) : focusRec(page, 'rg', id);
+  }
+  tab = 'page'; $$('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.v === 'page'));
+  setActive(page, true); showView('json');
+  const el = $(`#json [data-det="${key}"]`);
+  if (el) { el.classList.add('flash'); el.scrollIntoView({block: 'center', behavior: 'smooth'}); }
+}
+function setActive(page, force) {
+  if (page === active && !force) return;
+  active = page;
+  $$('.page.active, .cell.on').forEach(x => x.classList.remove('active', 'on'));
+  $('#page-' + page)?.classList.add('active'); $(`.cell[data-p="${page}"]`)?.classList.add('on');
+  $('#tab-page').textContent = 'Page ' + page;
+  if (itab === 'rec') renderRec(); else if (itab === 'json' && (tab !== 'full' || force)) renderJSON();
+  updRec();
+}
+
+/* ---------- JSON panel ---------- */
+const full = () => S && {file: S.file, model: S.model, threshold: S.threshold, dpi: S.dpi, summary: S.summary, pages: S.pages};
+const recJSON = page => S && {file: S.file, ...(page && {page}),
+  tables: [...S.rec.tables.values()].filter(t => !page || t.page === page), regions: [...S.rec.regions.values()].filter(b => !page || b.page === page)};
+const current = () => tab === 'page' ? S?.pages.find(p => p.page === active) : tab === 'struct' ? recJSON(active) : full();
+const prim = x => x === null || typeof x !== 'object';
+function val(x) {
+  if (x === null) return '<span class="j-null">null</span>';
+  if (typeof x === 'string') return `<span class="j-str">${esc(JSON.stringify(x))}</span>`;
+  if (typeof x === 'number') return `<span class="j-num">${x}</span>`;
+  if (typeof x === 'boolean') return `<span class="j-bool">${x}</span>`;
+  return '[' + x.map(val).join(', ') + ']';
+}
+function lines(v, ind, head, tail, key, det, out) {
+  const flat = prim(v) || (Array.isArray(v) ? v.every(prim) : !Object.keys(v).length);
+  if (flat) { out.push({h: ind + head + (prim(v) || Array.isArray(v) ? val(v) : '{}') + tail, det}); return out; }
+  const arr = Array.isArray(v), ents = arr ? v.map(x => [null, x]) : Object.entries(v);
+  out.push({h: ind + head + (arr ? '[' : '{'), det});
+  ents.forEach(([k, x], i) => lines(x, ind + '  ', k === null ? '' : `<span class="j-key">"${esc(k)}"</span>: `,
+    i < ents.length - 1 ? ',' : '', k, det ?? (!arr ? null : key === 'detections' ? 't' + x.id : key === 'text_blocks' ? 'p' + x.id : null), out));
+  out.push({h: ind + (arr ? ']' : '}') + tail, det});
+  return out;
+}
+function renderJSON() {
+  const obj = current(), box = $('#json');
+  if (!obj) { box.innerHTML = '<span class="j-dim">// waiting for results…</span>'; return; }
+  let h = '', cur = null;
+  for (const l of lines(obj, '', '', '', null, null, [])) {
+    if (l.det !== cur) {
+      if (cur !== null) h += '</div>';
+      if (l.det !== null) h += `<div class="j-det${tab === 'page' && sel?.page === active && sel.key === l.det ? ' sel' : ''}" data-det="${l.det}">`;
+      cur = l.det;
+    }
+    h += `<div class="ln">${l.h}</div>`;
+  }
+  box.innerHTML = h + (cur !== null ? '</div>' : '');
+  $('#jinfo').textContent = tab === 'page' ? `page ${obj.page} · ${obj.detections.length} table box(es) · ${obj.text_blocks.length} text block(s)`
+    : tab === 'struct' ? `page ${obj.page} · ${obj.tables.length} recognised table(s) · ${obj.regions.length} region(s)` : `${S.pages.length} page(s) · full response`;
+}
+$('#json').addEventListener('click', e => {
+  const d = e.target.closest('.j-det'); if (d && tab === 'page') select(active, d.dataset.det);
+});
+$('#copy').onclick = () => {
+  const o = current(); if (!o) return;
+  navigator.clipboard.writeText(JSON.stringify(o, null, 2)).then(() => toast('JSON copied to clipboard'), () => toast('Clipboard blocked by browser', true));
+};
+$('#dl').onclick = () => {
+  if (!S) return;
+  const a = document.createElement('a');
+  const rec = tab === 'struct';  // the Recognition sub-tab downloads every recognised table, else the detection
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(rec ? recJSON() : full(), null, 2)], {type: 'application/json'}));
+  a.download = S.file.replace(/\.(pdf|jpe?g|png)$/i, '') + (rec ? '_structure.json' : '_tables.json'); a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+renderRec();
+// where uploads are processed: a deployed GPU server (gpu_server.py) gets every PDF, so "never leaves" is not said then
+fetch('/health').then(r => r.json()).then(h => {
+  if (!h.gpu_server) return;
+  $('#where').textContent = 'runs on your GPU server';
+  $('#privacy').textContent = 'sent to your Modal GPU server for processing';
+}).catch(() => {});
+</script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+# only the code, the page and the fine-tuned Table Transformer go into the image; doc/ and output/ are
+# mounted (docker-compose.yml), reports/ and the older models stay out
+*
+!*.py
+!requirements.txt
+!index.html
+!models/tatr-finetuned-01-11
+**/__pycache__

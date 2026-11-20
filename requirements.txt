@@ -1,0 +1,17 @@
+# AEIDS runtime + test dependencies (Python 3.11, D-013). Pinned exactly.
+fastapi==0.136.1
+uvicorn==0.52.4
+python-multipart==0.0.29
+pydantic==2.14.4
+pydantic-settings==2.16.3
+sqlalchemy==2.1.9
+alembic==1.20.1
+psycopg[binary]==3.3.9
+pypdf==7.1.1  # page count check of a structure against its PDF (D-017)
+httpx==0.28.1  # OpenRouter client (D-001, D-002)
+qdrant-client==1.20.0  # vector index (D-007)
+rq==3.0.0  # background worker (D-004)
+redis==8.1.0
+
+# tests
+pytest==9.2.0

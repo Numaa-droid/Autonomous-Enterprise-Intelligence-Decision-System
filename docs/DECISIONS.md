@@ -1,0 +1,222 @@
+# AEIDS — Decision Log
+
+Record each design or library choice in a few lines: what was chosen, what else was considered, and why. Newest at the top.
+
+## Template
+```
+### D-XXX — <title>
+- Date: YYYY-MM-DD
+- Status: proposed | accepted | superseded by D-YYY
+- Decision:
+- Alternatives considered:
+- Why:
+- Consequences / follow-ups:
+```
+
+---
+
+## Open decisions
+
+### D-003 — Orchestration: hand-written vs framework (e.g. LangGraph)
+- Status: decided in D-024 (hand-written)
+- Leaning: hand-written state machine persisted in Postgres, so transitions, retries and resume logic are fully owned and explainable
+
+### D-006 — PDF parsing / table extraction
+- Status: proposed
+- Decision: reuse the existing TableLens pipeline in this repo (Table Transformer detection + docling-layout-heron fusion; fine-tuned Table Transformer structure model; PaddleOCR-VL-1.6 for scans and charts) behind an `aeids/ingestion/` interface.
+- Alternatives considered: docling's full document converter, pdfplumber/Camelot (native PDFs only), a hosted service such as Azure Document Intelligence (removed from the repo in `a4531cf`).
+- Why: already built and measured (fine-tuned model on held-out reports: rows 82.7 %, columns 82.7 %, cell adjacency F1 94.0 %); gives page numbers and boxes for evidence; handles scanned and sideways tables.
+- Consequences / follow-ups: heavy dependencies (torch, paddle) pinned for Python 3.11; recognition needs a GPU (local or Modal `gpu_server.py`), so ingestion is slow on CPU; AEIDS reads the generic `_structure.json`, not the medical reference JSON (D-010); measure table accuracy on the benchmark corpus's financial statements.
+
+### D-009 — Tracing (see D-022: own spans in Postgres for now)
+- Status: open
+- Options: Langfuse, OpenTelemetry + a viewer
+
+---
+
+## Proposed decisions
+
+### D-011 — Separate task and workflow state machines; rework as a child task
+- Date: 2026-11-20
+- Status: accepted (implemented in M3, D-024)
+- Decision: task and workflow states are two state machines with explicit transition tables (`ARCHITECTURE.md` §3.1). A rejected task is never re-run; rework is a new task with `parent_task_id` and `rework_round`. Workers hold a lease; an expired lease returns the task to `QUEUED`.
+- Alternatives considered: one combined lifecycle (the first draft); re-running the rejected task in place.
+- Why: the first draft had no exit from `BLOCKED` / `NEEDS_HUMAN_REVIEW`, no path for tasks without findings, and mixed workflow states (`REPORTING`, `COMPLETED`) into tasks. A new rework task keeps the rejected attempt auditable.
+- Consequences / follow-ups: tables `task_dependencies`, `task_transitions`; columns `idempotency_key`, `rework_round`, `lease_expires_at` on `agent_tasks`.
+
+### D-012 — Numbers as Decimal strings with separate unit, scale and currency
+- Date: 2026-11-20
+- Status: proposed
+- Decision: all numeric values are `Decimal`, serialised as JSON strings. Calculation inputs and outputs are `Quantity` objects (value, unit, scale, currency, period, evidence_id), stored in a `calculations` table.
+- Alternatives considered: JSON numbers (float precision loss); fused unit strings such as `INR_crore`.
+- Why: Verification must replay calculations and check unit, scale and period of every input, which a bare `dict[str, Decimal]` cannot carry.
+
+## Accepted decisions
+
+### D-024 — M3 orchestration: hand-written Supervisor over Postgres state, RQ workers with leases
+- Date: 2026-11-21
+- Status: accepted (resolves D-003; D-011 accepted as implemented)
+- Decision:
+  - **Contracts** (`aeids/contracts/`, schema 1.0): `TaskMessage`, `AgentResult`, `Finding`, `Quantity`, `Calculation`, `EvidenceRef`, `EvidenceProposal`, `VerificationDecision`. Unknown fields refused; numbers are `Decimal` (floats refused, strings in JSON); currency amounts need an ISO currency; a finding needs at least one evidence reference; a finding's value equals its calculation's output; error results carry errors and no findings.
+  - **State machines** (`aeids/orchestration/states.py`): exactly the task and workflow transitions of ARCHITECTURE.md §3.1; anything else raises `IllegalTransition` and writes nothing. Every task change is a `task_transitions` row and every workflow change an `audit_events` row (reason, actor).
+  - **Supervisor** (`supervisor.py`): plans (M3: a template plan `extract` → `analyse`; an LLM planner comes with M4), adds a verification task for every task that produced findings, applies verification outcomes, creates rework tasks (`parent_task_id`, `rework_round` + 1, dependents re-pointed), retries transient errors with exponential backoff, retries schema errors once, never retries permission errors, sends agent-blocked tasks to human review, and builds the report from verified findings only (everything else is a limitation). All of this is idempotent reconciliation (`tick`) under a workflow row lock; unique idempotency keys per task.
+  - **Workers** (`runner.py`, `jobs.py`): claim a task with a conditional update (one claim at a time) and a lease of `timeout_seconds`; run the agent outside any transaction; hand the result back. Results are accepted only from the lease holder (fencing). An expired lease returns the task to QUEUED (counted as an attempt). Workers resume unfinished workflows when they start. Agents propose evidence (chunk, page, exact quote); the Supervisor stores it only after checking the chunk belongs to the tenant and the quote is in its text, so nothing is invented or stored twice.
+  - **Agents** (`aeids/agents/`): narrow read-only context (tenant-scoped search, evidence lookup), no state changes, no agent-to-agent calls. M3 stand-ins: Document Intelligence (real hybrid search, evidence quotes), Financial Analyst (a summary finding citing the evidence, no numbers yet), Verification (real structural check: cited evidence exists for the tenant and quotes its chunk).
+  - **API/console**: `POST/GET /api/v1/workflows`, `/{id}`, `/{id}/tasks`, `/{id}/findings`, `/{id}/cancel`; console page Workflows (live task graph, timeline, findings with evidence, report). Each workflow is one trace: a root span plus a span per task run.
+- Alternatives considered: LangGraph (D-003; its checkpointing would duplicate the Postgres state machine and hide transitions), RQ retries for agent errors (retry policy belongs to the Supervisor), letting agents write evidence directly (breaks fencing).
+- Why: rules 3–5 and 8 must be owned and auditable; reconciliation makes crash recovery a non-event.
+- Consequences / follow-ups: M3 done-when shown with real processes: worker A was `kill -9`ed holding `analyse`; after the 25 s lease worker B re-ran it (attempt 2, "lease recovered"); `extract` (VERIFIED) ran once; one finding, no duplicates. M4 replaces the stand-ins with LLM agents and the calc module; human review endpoints (`/reviews`) arrive with M5.
+
+### D-023 — Repeatable embeddings: pinned provider, cached question vectors
+- Date: 2026-11-21
+- Status: accepted (fixes the benchmark repeatability follow-up of D-021/D-022)
+- Decision: OpenRouter serves `qwen/qwen3-embedding-8b` from three providers (Nebius bf16, DeepInfra, SiliconFlow fp8) whose vectors differ: the same question gave cosine 0.9965 between providers and 0.9999 even within one provider. AEIDS now (1) pins the provider: `AEIDS_EMBEDDING_PROVIDER=nebius` (highest precision, bf16) with `AEIDS_EMBEDDING_ALLOW_FALLBACKS=false`, so documents and questions are always embedded the same way; (2) caches question vectors in Postgres (`query_embeddings`, key = SHA-256 of model, provider and the exact embedded text; migration 0005), so the same question always gets the same vector; (3) rounds every vector to float32 (what Qdrant stores) before returning or caching it, so a fresh vector equals its cached copy; (4) can re-embed an indexed version in place (`reindex_version`: same point ids are overwritten, `is_current` kept, count verified, the document never leaves search; `eval/run_retrieval.py --reindex`). Each embedding span records the provider that answered.
+- Alternatives considered: allowing provider fallbacks (silently mixes vector spaces); averaging several calls (costly, still not exact); caching document vectors too (they are embedded once and stored in Qdrant already).
+- Why: the benchmark must be repeatable before AEIDS is compared with the baseline (Release 0 definition of done).
+- Consequences / follow-ups: after re-embedding the 5-report corpus with Nebius, three runs gave identical ranks for all 93 question/mode pairs: dense R@5 0.61 / R@10 0.81 / MRR 0.53; keyword 0.55 / 0.81 / 0.37; **hybrid 0.77 / 0.90 / 0.53**; m1 and n6 are not found by any mode. If Nebius is down, embedding fails instead of falling back: indexing is retried by the job queue and hybrid search falls back to keyword with a warning. Changing provider or model requires `--reindex` (and, for users' documents, `reindex_version`). The query cache has no expiry yet.
+
+### D-022 — Run tracing in Postgres and a web console at /ui
+- Date: 2026-11-20
+- Status: accepted (resolves D-009 for now; pulls a small operator console forward from after Release 0, at the user's request)
+- Decision:
+  - **Tracing** (`aeids/tracing.py`): every operation is a span in a trace, like LangSmith: processing jobs (`process_version` → `tablelens` → `normalise_and_chunk` → `index_version` → `embed_chunks` → `openrouter.embeddings` per batch → `qdrant.replace_version`), searches (`search` → `dense_search` → `keyword_search` → `rrf_fuse`), LLM calls (`openrouter.chat`) and benchmark runs. Spans nest through a context variable (also across the embedding thread pool) and carry kind, status, timing, inputs, outputs, attributes, model, tokens and cost. Ids are OpenTelemetry-shaped (32/16 hex) so traces can be exported to Langfuse/OTel later. Stored in `trace_spans` (migration 0004) by `SqlTraceSink`, each span in its own short transaction; a failing sink never breaks the traced work. Inputs/outputs are JSON-safe, truncated (2,000 chars, 50 items) and key-like strings are redacted. `AEIDS_TRACING_ENABLED` turns storing off.
+  - **Console** (`aeids/web/`, served at `/ui`, data from `/api/v1/dashboard/*`): overview (service health, KPIs, pipeline graphic, activity, latency by step, version states), documents (each version's pipeline progress, errors, warnings), search playground (ranks in both lists, link to the trace), evaluation (scores by mode, per-question rank heatmap, run history), traces (list and a waterfall with an inspector for inputs/outputs/attributes) and logs. Plain HTML/CSS/JS, no build step, SVG charts drawn in place; dark and light themes in the brand colours midnight black `#0B0B0C`, pure white `#FFFFFF` and lime green `#C6F432` (lime for fills and single-series charts; in the light theme a dark lime `#4A6600` for accent text, since lime on white is unreadable). Multi-series charts keep palette colours that pass the colour-blindness checks: lime among them is a deeper `#7BA20B`/`#7FA30A`, paired with blue and magenta (orange next to lime failed the deuteranopia check). Status colours (failed red, indexed green) stay reserved and always come with an icon and label. Untrusted text (documents, trace payloads, logs) is only inserted as text.
+  - **Uploads from the console**: the Documents page uploads through the main API (`POST /api/v1/documents`, `/{id}/versions`, `/process`), so uploads always land in the default tenant; viewing another tenant shows a note and switches back after an upload. Progress via XHR; the page polls every 3 s while a version uploaded in the last 30 minutes is pending/parsing/indexing.
+  - **Logs**: `./start.sh` also writes each program's lines to `logs/<name>.log` (5 MB, one old file kept); the console tails them. Uvicorn access lines for the console's own GET polling are dropped.
+- Alternatives considered: Langfuse (another service to run); OpenTelemetry collector + Jaeger (no token/cost view, more moving parts); a React/Vite frontend (a build step for a local console).
+- Why: the user asked for a LangSmith-like tracker and a page with results and logs; Postgres is already there, and the `agent_runs` audit of M3 can build on the same spans.
+- Consequences / follow-ups: the console reads any tenant and every trace and has no login, like the rest of the API: keep it on 127.0.0.1 until auth exists. No retention for `trace_spans` yet. Agent runs (M3) should record their spans with prompt version and trace id. Benchmark repeatability: two runs with identical document vectors gave hybrid Recall@5 0.81 and 0.74, because OpenRouter returned slightly different query vectors; pinning the provider (or caching query embeddings for the benchmark) is needed before comparing AEIDS with the baseline.
+
+### D-021 — Indexing, search and the retrieval benchmark (M2)
+- Date: 2026-11-20
+- Status: accepted (details for D-007; completes rule 6)
+- Decision:
+  - **Indexing** is the last step of the processing job (`aeids/ingestion/indexing.py`): `parsed -> indexing -> indexed | failed`. Chunks are embedded (OpenRouter, 32 per batch, 4 batches in parallel), written to Qdrant (one point per chunk, point id = chunk id, payload as ARCHITECTURE.md §4.1 plus `kind` and `chunk_index`), and the point count is verified before anything points at them. A retry after a successful parse only re-indexes (`failed -> indexing` when `parsed_at` is set) and replaces the version's points.
+  - **Versioning** (rule 6): an upload is stored as *not current*. Only after its index is verified does a version become current: Qdrant marks the new points current, Postgres switches the pointer, then the old points are marked not current. A version finishing after a newer one does not take the pointer back.
+  - **Collections**: one per embedding model and size (`aeids_chunks__<model>__<dim>`, cosine), with payload indexes on tenant (tenant key), company, document, version, type, `is_current` and `financial_year`.
+  - **Search** (`aeids/retrieval/search.py`, `POST /api/v1/search`): modes `dense`, `keyword` and `hybrid` (default). Keyword search is Postgres full-text search on section + text (`english`), with the question's lexemes OR-ed and quoted (no user text reaches the tsquery parser unquoted) and ranked by `ts_rank`. Hybrid is RRF with k = 60 over the top 50 of each list. Every hit is re-checked in Postgres (tenant, current version, `indexed` status, active document, filters), so a stale Qdrant payload never leaks a superseded or foreign chunk. If dense search is down, hybrid falls back to keyword with a warning; `dense` alone returns 503. SQLite (tests) uses a small BM25 scorer instead of full-text search.
+  - **Benchmark** (`eval/run_retrieval.py`): the five reports of D-008 in a separate `eval` tenant, loaded from their existing TableLens output; 31 questions in `eval/retrieval_questions.jsonl`. Gold pages are the pages whose text matches the question's `evidence` pattern (the printed answer), and `check-gold` re-derives them. Metrics: Recall@5 and Recall@10 (share of questions with a gold page of the right report in the top K) and MRR@10.
+- Alternatives considered: promote on upload (the M1 rule); `websearch_to_tsquery` (AND semantics: long questions match nothing); one shared collection for all models; hand-picked gold pages.
+- Why: rule 6 and rule 10; OR-ed lexemes keep keyword recall on natural-language questions; pattern-derived gold pages can be checked by anyone.
+- Consequences / follow-ups: first run (2026-11-20, `qwen/qwen3-embedding-8b`, 2,030 chunks, embedding cost USD 0.0056): dense R@5 0.61 / R@10 0.84 / MRR 0.50; keyword 0.55 / 0.81 / 0.37; **hybrid 0.81 / 0.90 / 0.51**. Missed by all modes: NVIDIA's employee count (the right chunk exists, but many chunks about employee stock plans in the exhibits and proxy outrank it). Candidates for later: a reranker, company/fiscal-year filters from the question, section-heading weights. Re-parsing an `indexed` version is not supported yet (its points would need removing first).
+
+### D-020 — TableLens code copied into this repo (`tablelens/`)
+- Date: 2026-11-20
+- Status: accepted (amends D-015: one project folder instead of two)
+- Decision: the TableLens code from `../IntelligencePDF` is copied unchanged into `tablelens/`: every Python file (including `medical.py`, `reference.py` and `spotting_check.py`, which `app.py` and `gpu_server.py` import), `index.html`, its own `requirements.txt`, `Dockerfile`, `docker-compose.yml`, `.dockerignore`, `README.md`, and the fine-tuned Table Transformer `models/tatr-finetuned-01-11` (Git LFS, `.gitattributes`). Left out: `doc/`, `output/`, the virtual env, caches, `.git` history, and the old AEIDS docs. `tablelens/doc/` and `tablelens/output/` are git-ignored (rule 11).
+- Alternatives considered: keep two folders (D-015); turn TableLens into an importable package that the worker calls in-process.
+- Why: chosen by the user. Running and maintaining two folders was double work.
+- Consequences / follow-ups: TableLens still runs as its own process (`cd tablelens && python app.py`, port 8000) with its own Python 3.11 env (`tablelens/.venv`), because torch/paddle stay out of the AEIDS env (D-014). AEIDS still talks to it over HTTP (D-019), so `aeids/` imports nothing from `tablelens/`, and medical stays outside AEIDS (D-010). Edit TableLens in `tablelens/` from now on; `../IntelligencePDF` is the old copy and holds the git history (`git show 581640e:reference.py`) and the existing outputs of the 5-company corpus. `test_recognise.py` already fails in the original (its stub page has no `get_texttrace`); the start-up self-checks pass.
+
+### D-019 — Uploads are parsed automatically by calling the TableLens server
+- Date: 2026-11-20
+- Status: accepted (the user chose this over a manual import command; extends D-017)
+- Decision: a new upload (or version) queues an RQ job (`process-<version_id>`) that sends the stored PDF to the TableLens server (IntelligencePDF `app.py`, `AEIDS_TABLELENS_URL`, default `http://127.0.0.1:8000`): `POST /detect`, then `POST /recognise` with `mode=all`, polling `GET /events/{job}` every ≤ 10 s (TableLens drops jobs not polled for 60 s), then `GET /output/<stem>/structure/<stem>_structure.json`. The result goes through the same validation/normalisation/chunking as an attached file. When TableLens' Modal GPU server is deployed, `app.py` forwards the work there itself; AEIDS never talks to Modal. TableLens stays a separate project; no change was needed there.
+- Naming: the PDF is sent as `<file stem>-<sha256[:12]>.pdf`, so a replacement version with the same file name never gets an old result; an existing TableLens result for that name is reused (a retry never re-runs GPU work). `reuse_by_filename=true` (process endpoint) reuses a result made earlier under the plain file name, checked by page count.
+- Status and retries: `parser_status` is `parsing` for the whole TableLens run. TableLens down/restarted/timeouts are retried by RQ (60 s, 5 min, 15 min); a TableLens job error, a 4xx, or an invalid/mismatched structure marks the version `failed` with the reason, not retried. `POST …/versions/{id}/process` re-runs; `python -m aeids.worker requeue` re-queues versions left pending/failed/stuck by a lost worker or queue outage. An upload succeeds even when Redis is down (`processing: not_queued`).
+- Alternatives considered: manual attach / an import command for TableLens output folders (option 2); importing TableLens in-process.
+- Consequences: AEIDS uploads appear in TableLens' `doc/` and `output/` under the suffixed names. TableLens runs one job at a time, so large batches queue there. TableLens' medical reference-JSON step logs an error on financial reports; AEIDS ignores that message. The worker runs RQ `SimpleWorker` on macOS (fork safety).
+
+### D-018 — Section-aware chunking
+- Date: 2026-11-20
+- Status: accepted (chunking version 2)
+- Decision: headings form a section tree — level 0 `PART I–IV`, 1 `Item 1A.` / `ITEM 7.`, 2 financial statement titles, `Note N –/—/.` and other ALL-CAPS headings (glossy reports such as Microsoft's), 3 any other short heading; a sentence-like "heading" (≥ 12 words, > 120 chars, or a full sentence) is read as a paragraph (10-K risk-factor leads). Every chunk carries its path (`PART II > Item 7. … > Segment Operating Performance`) in `section`, in `meta.section_path`, and as the first line of its text (`Section: …`) so dense and keyword search both see it. Text never crosses a section, except that a subsection under 400 characters merges with its next sibling under their common parent (`meta.subsections`). Text of up to 400 characters right before a table in the same section becomes the table chunk's lead-in.
+- Alternatives considered: flat "last heading" sections (version 1); fixed-size windows with overlap.
+- Why: on the five-report corpus, version 1 produced many one-sentence sections (risk factors) and table chunks without their caption; version 2 cut Apple from 423 to 290 chunks (text median ~1,000 chars) and gives 20–39 tables per report their lead-in sentence.
+- Consequences: ALL-CAPS headings are all level 2, so in glossy reports a caps subsection replaces its caps parent instead of nesting. Changing chunking means re-indexing (`chunking_version` is stored on each chunk).
+
+### D-008 — Benchmark corpus: five US big-tech annual reports
+- Date: 2026-11-20
+- Status: accepted
+- Decision: Apple FY2025 10-K, Microsoft FY2025 10-K, NVIDIA FY2026 10-K, Tesla FY2025 10-K, Alphabet annual report (`goog014907-ars`, fiscal years 2023–2025). PDFs in `../IntelligencePDF/doc/`, TableLens output in `../IntelligencePDF/output/`; not in git — `eval/corpus.csv` will record file, fiscal year, SHA-256 and source URL.
+- Why: chosen by the user; public filings; all five parse (tables 47–112 per report, revenue and net income read with USD/million/fiscal year correctly).
+- Consequences / follow-ups: Alphabet prints years oldest-first, a useful check that periods come from headers, not column position. `eval/corpus.csv` lists file, company, fiscal year, SHA-256 and page count (D-021); the source URLs are still to be filled in.
+
+### D-007 — Hybrid retrieval: Qdrant dense + Postgres full-text, fused with RRF
+- Date: 2026-11-20
+- Status: accepted
+- Decision: dense search in Qdrant; keyword search with Postgres full-text search on chunk text and section; results combined with reciprocal rank fusion. Every query filters by `tenant_id` and, by default, `is_current`.
+- Alternatives considered: Qdrant sparse vectors (BM25/SPLADE).
+- Why: no extra model or service; Postgres is already the source of truth for chunks.
+
+### D-004 — Background worker: RQ on Redis
+- Date: 2026-11-20
+- Status: accepted
+- Decision: RQ (`rq==3.0.0`) on the compose Redis for indexing jobs, with bounded retries for transient errors.
+- Alternatives considered: Celery, Arq, Dramatiq.
+- Why: simplest option for local Docker Compose; Redis is already part of the stack. Task-state durability stays in Postgres (rule 5), not in the queue.
+
+### D-002 — Embeddings: qwen/qwen3-embedding-8b via OpenRouter
+- Date: 2026-11-20
+- Status: accepted (replaces the local-model suggestion)
+- Decision: `qwen/qwen3-embedding-8b` through OpenRouter's `/embeddings` endpoint ($0.01 per million tokens, 40,960-token context on 2026-11-20). Questions are embedded with a task instruction (`Instruct: …\nQuery: …`), documents without. The vector size is taken from the first response and fixed per Qdrant collection; the collection name includes the model, so a model change means a new collection and a re-index.
+- Alternatives considered: local BAAI/bge-small / bge-base via fastembed (measured 4–17 chunks/s on this Mac's CPU: 3–12 minutes for the corpus).
+- Why: chosen by the user; much stronger model at negligible cost (the whole corpus is about 1M tokens).
+- Consequences: chunk text is sent to OpenRouter. Acceptable for public filings; private documents would need a different setting. Needs `AEIDS_OPENROUTER_API_KEY`.
+
+### D-001 — LLM: qwen/qwen3.8-flash via OpenRouter
+- Date: 2026-11-20
+- Status: accepted
+- Decision: `qwen/qwen3.8-flash` through OpenRouter chat completions ($0.15 / $0.47 per million input / output tokens, 1M context on 2026-11-20; supports `response_format`, structured outputs and tools). Calls use temperature 0, request usage accounting, and go through `aeids/llm/openrouter.py`, which retries only transient errors (timeouts, 408/425/429/5xx) with exponential backoff and never retries 401/402/403 or bad requests. The key comes only from `AEIDS_OPENROUTER_API_KEY` and is scrubbed from error messages.
+- Why: chosen by the user; cheap enough for repeated benchmark runs.
+- Consequences: the single-agent RAG baseline (M6) uses the same model, so the comparison is fair. `python -m aeids.llm check` verifies the setup.
+
+### D-017 — TableLens handoff: AEIDS reads `_structure.json`; financial normalisation rules
+- Date: 2026-11-20
+- Status: accepted
+- Decision: TableLens runs on its own (local or Modal GPU) and writes `output/<name>/structure/<name>_structure.json`; the user chose that AEIDS reads these files. A file is attached to a stored version with `POST /api/v1/documents/{id}/versions/{vid}/structure` or `python -m aeids.ingestion attach`; `python -m aeids.ingestion inspect` shows the normalised tables without a database. On attach: schema validation (untrusted input), page numbers checked against the stored PDF (pypdf; a structure referring to a page the PDF lacks is rejected), file-name mismatch is a warning, the JSON is stored as a derived artifact (`<tenant>/<sha[:2]>/<sha>.json`), chunks replace any earlier chunks of the version. `parser_status` moves only `pending→parsing→parsed→indexing→indexed`, `parsing/indexing→failed`, `failed/parsed→parsing`; re-parsing an `indexed` version is refused until indexing can remove its vectors.
+- Normalisation (port of `reference.py` @581640e, checked on Apple's FY2025 10-K): `Decimal` values; unit / ISO currency / scale separate; Indian lakh grouping, `Rs.`, `Cr`, `Lacs`; unit from column header → title → subtitle → up to 3 texts before the table on its page → the previous table's caption on that page; "except" clauses give per-share rows/columns scale `units` and share counts unit `count` with the stated scale; a label wrapped over two rows is joined; unflagged second header lines join the header; `period` = `FY<year>` only when a header names exactly one year (date, `FY25`, `2024-25`, bare year); a total row closes its section. Each cell records `scale_source`. Charts read by PaddleOCR-VL are chunked but flagged `image_read`.
+- Alternatives considered: AEIDS calling the TableLens server per PDF; importing TableLens in-process (torch/paddle in AEIDS).
+- Why: TableLens output already exists per document and is inspectable; no GPU stack in AEIDS (D-015).
+- Consequences / follow-ups: label indent levels need PDF words, which `_structure.json` lacks (`level` is None). Wrapped labels and unflagged header lines would be better fixed in TableLens itself. Ingestion runs in the request until the worker (D-004) exists.
+
+### D-016 — Upload dedupe and re-upload semantics
+- Date: 2026-11-20
+- Status: accepted
+- Decision: `POST /documents` with bytes whose SHA-256 already exists anywhere in the tenant returns that existing version (HTTP 200, `duplicate: true`) and creates nothing. `POST /documents/{id}/versions` with bytes matching an existing version of *that* document returns it (200) and leaves the current pointer unchanged — re-uploading an old version does not roll back. The same bytes in another tenant are a new document. New versions get `max(version_number) + 1` under a row lock on the document. Original filenames are display-only (sanitised basename); storage keys come from the checksum.
+- Alternatives considered: re-upload of an old version makes it current again; dedupe only within a document.
+- Why: keeps uploads idempotent for retries and avoids two logical documents for one file; an explicit rollback can be a separate API later (`promote_to_current` already supports it).
+
+### D-015 — AEIDS is a standalone repo; TableLens stays in its own repo
+- Date: 2026-11-20
+- Status: accepted, amended by D-020 (TableLens code now copied into `tablelens/`) (supersedes the file naming in D-014; amends D-006's "in this repo")
+- Decision: AEIDS lives in `Desktop/saurabh/AEIDS` with its own git repo, `requirements.txt` and `docker-compose.yml`. TableLens stays in `../IntelligencePDF` (GitHub `PDF-Document-Parser`). AEIDS ingestion consumes TableLens output (`_structure.json`) through an interface in `aeids/ingestion/`; the exact handoff is decided at the start of M2 with the user, who built the parsing part.
+- Alternatives considered: `aeids/` package inside the TableLens repo (the original plan, D-014).
+- Why: chosen by the user; keeps torch/paddle and the GPU image out of the AEIDS environment, and lets each repo be versioned and deployed on its own.
+- Consequences / follow-ups: the first M1 build (inside IntelligencePDF, never committed) was lost and rebuilt here. The `intelligencepdf` Docker Compose project's Postgres/Qdrant/Redis bind the same ports as `docker-compose.yml`; stop one before starting the other.
+
+### D-014 — AEIDS dependencies and services kept apart from TableLens
+- Date: 2026-11-20
+- Status: superseded by D-015 (file names); the separation itself still holds
+- Decision: AEIDS pins live in `requirements-aeids.txt` and its services (Postgres 18, Qdrant 1.20.2, Redis 8.8) in `docker-compose.aeids.yml`; the AEIDS API runs on port 8001. `requirements.txt` and `docker-compose.yml` stay TableLens-only.
+- Alternatives considered: one requirements file and one compose file for both.
+- Why: the TableLens Docker image and Modal server install `requirements.txt`; adding the web/DB stack there would grow them for nothing, and the GPU container cannot start on a laptop without NVIDIA.
+- Consequences / follow-ups: M2 decides how the ingestion worker reaches TableLens (in-process import vs the GPU server).
+
+### D-013 — Python 3.11
+- Date: 2026-11-20
+- Status: accepted
+- Decision: Python 3.11 for the whole repo (`.venv` built with `uv venv --python 3.11`).
+- Why: the existing pins (numpy 1.26.4, torch 2.9.1, paddlepaddle 3.2.1) target 3.11; numpy 1.26 has no wheels for newer Pythons.
+
+### D-005 — Object storage
+- Date: 2026-11-20
+- Status: accepted
+- Decision: local filesystem behind the `ObjectStore` interface (`aeids/storage.py`), content-addressed keys `<tenant>/<sha[:2]>/<sha>.pdf`, URIs `local://<key>`.
+- Alternatives considered: MinIO (S3-compatible) from the start.
+- Why: one less service for Release 0; content-addressed keys make storing idempotent and deduplicate identical files.
+- Consequences / follow-ups: a MinIO store implements the same `put_file`; uploads still stage on local disk first.
+
+### D-010 — AEIDS is financial-report only; the medical lab-report work is separate
+- Date: 2026-11-20
+- Status: accepted
+- Decision: AEIDS analyses company financial reports (annual reports, ESG/BRSR). The medical lab-report feature (`medical.py`, `reference.py` with schema `medical-report/1.0`) is a separate TableLens feature, outside AEIDS scope, and is left as it is. AEIDS ingestion consumes the generic recognition output (`output/<name>/structure/<name>_structure.json`) and does its own financial normalisation in `aeids/ingestion/`, ported from the financial `reference.py` in commit `581640e` (currency + scale such as "EUR million" / lakh / crore, periods from column headers, signed negatives, total rows, indent levels).
+- Alternatives considered: generalising `reference.py` to serve both; re-targeting AEIDS at medical reports.
+- Why: the user confirmed medical is not part of AEIDS. The recognition output is domain-neutral, and the pre-medical `reference.py` already solved the financial normalisation, so nothing medical needs to change.
+- Consequences / follow-ups: `aeids/` never imports `medical.py` or the medical reference JSON; the TableLens self-checks must keep passing; the financial normaliser gets its own tests (port the `581640e` self-check cases).
+
+### D-000 — Release 0 scope
+- Date: 2026-11-20
+- Status: accepted
+- Decision: Build Supervisor + Document Intelligence + Financial Analyst + Verification, plus a single-agent RAG baseline and benchmark, before adding Research, Regulatory or Risk agents.
+- Why: Proves the core claim (verified, evidence-grounded answers beat a simple RAG baseline) with the smallest system that can be finished and measured.

@@ -1,0 +1,47 @@
+# AEIDS local services. All ports bind to 127.0.0.1 only.
+#   docker compose up -d
+# Needs AEIDS_DB_PASSWORD in .env (see .env.example).
+name: aeids
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: aeids
+      POSTGRES_DB: aeids
+      POSTGRES_PASSWORD: ${AEIDS_DB_PASSWORD:?set AEIDS_DB_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      # Postgres 18 images keep data under /var/lib/postgresql/18/...; mount the parent.
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aeids -d aeids"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  qdrant:
+    image: qdrant/qdrant:v1.20.2
+    ports:
+      - "127.0.0.1:6333:6333"
+      - "127.0.0.1:6334:6334"
+    volumes:
+      - qdrant:/qdrant/storage
+
+  redis:
+    image: redis:8.8-alpine
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
+  qdrant:
+  redis:

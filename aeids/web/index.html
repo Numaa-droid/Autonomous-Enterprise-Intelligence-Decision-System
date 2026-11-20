@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b0b0c">
+  <title>AEIDS Console</title>
+  <meta name="description" content="AEIDS: documents, search, retrieval benchmark, run traces and logs.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23c6f432'/%3E%3Cpath d='M9 23l7-14 7 14M11.8 18h8.4' stroke='%230b0b0c' stroke-width='2.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+  <script>
+    try { const t = localStorage.getItem("aeids-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+  </script>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true">
+          <rect width="40" height="40" rx="11" fill="#c6f432"/>
+          <path d="M11 29l9-18 9 18M14.6 22.5h10.8" stroke="#0b0b0c" stroke-width="3.2" fill="none"
+                stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div>
+          <div class="brand-name">AEIDS</div>
+          <div class="brand-sub">Enterprise Intelligence<br>Console</div>
+        </div>
+      </div>
+      <nav class="nav" id="nav" aria-label="Pages"></nav>
+      <div class="sidebar-foot">
+        <div class="model-chip" id="model-chip"><b>Models</b>…</div>
+        <button class="btn" id="theme-btn" type="button"></button>
+      </div>
+    </aside>
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <h1 id="page-title">Overview</h1>
+          <div class="crumb" id="page-crumb"></div>
+        </div>
+        <div class="spacer"></div>
+        <label class="row small muted" for="tenant-select">Tenant
+          <select class="select" id="tenant-select"></select>
+        </label>
+        <label class="toggle small" title="Refresh this page every few seconds">
+          <input type="checkbox" id="auto-refresh"> <span class="live-dot" id="live-dot" hidden></span> Live
+        </label>
+        <button class="btn icon" id="refresh-btn" type="button" title="Refresh" aria-label="Refresh"></button>
+      </header>
+      <section class="content" id="view" aria-live="polite"></section>
+    </main>
+  </div>
+  <div class="tooltip" id="tooltip" role="tooltip"></div>
+  <script src="app.js"></script>
+</body>
+</html>

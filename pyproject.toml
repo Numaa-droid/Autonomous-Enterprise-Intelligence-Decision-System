@@ -1,0 +1,15 @@
+[project]
+name = "aeids"
+version = "0.1.0"
+description = "Autonomous Enterprise Intelligence & Decision System"
+requires-python = ">=3.11,<3.12"
+
+[tool.setuptools.packages.find]
+include = ["aeids*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
+# local (in-memory) Qdrant in tests ignores payload indexes; the server uses them
+filterwarnings = ["ignore:Payload indexes have no effect:UserWarning"]

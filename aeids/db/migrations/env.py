@@ -1,0 +1,57 @@
+"""Alembic environment. URL: ``sqlalchemy.url`` set programmatically (tests) or AEIDS_DATABASE_URL."""
+
+from __future__ import annotations
+
+from logging.config import fileConfig
+
+from alembic import context
+
+from aeids.config import get_settings
+from aeids.db.models import UNMAPPED, Base
+from aeids.db.session import make_engine
+
+config = context.config
+if config.config_file_name is not None and config.attributes.get("configure_logger", True):
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
+
+target_metadata = Base.metadata
+
+
+def _include_object(_obj, name, _type, _reflected, _compare_to) -> bool:
+    # autogenerate must not try to drop the Postgres-only full-text column (0003)
+    return name not in UNMAPPED
+
+
+def _url() -> str:
+    return config.get_main_option("sqlalchemy.url") or get_settings().database_url
+
+
+def run_migrations_offline() -> None:
+    context.configure(
+        url=_url(),
+        target_metadata=target_metadata,
+        literal_binds=True,
+        render_as_batch=True,
+    )
+    with context.begin_transaction():
+        context.run_migrations()
+
+
+def run_migrations_online() -> None:
+    engine = make_engine(_url())
+    with engine.connect() as connection:
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            render_as_batch=connection.dialect.name == "sqlite",
+            include_object=_include_object,
+        )
+        with context.begin_transaction():
+            context.run_migrations()
+    engine.dispose()
+
+
+if context.is_offline_mode():
+    run_migrations_offline()
+else:
+    run_migrations_online()

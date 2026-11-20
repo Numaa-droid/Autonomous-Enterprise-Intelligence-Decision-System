@@ -1,0 +1,16 @@
+# docker compose up -d --build   (needs the NVIDIA Container Toolkit on the host)  ->  http://127.0.0.1:8000
+# docker compose logs -f          the server log; the pipeline log is in the UI
+services:
+  tablelens:
+    build: .
+    ports:
+      - "127.0.0.1:8000:8000"   # the UI has no login: keep it off the network
+    volumes:
+      - ./doc:/srv/tablelens/doc                        # the PDFs (an uploaded PDF is saved here)
+      - ./output:/srv/tablelens/output                  # detection + recognition results
+    deploy:
+      resources:
+        reservations:
+          devices: [{ driver: nvidia, count: all, capabilities: [gpu] }]
+    restart: unless-stopped
+    stop_grace_period: 30s   # a running job saves what it has read before the app exits (app.lifespan: 25 s)
