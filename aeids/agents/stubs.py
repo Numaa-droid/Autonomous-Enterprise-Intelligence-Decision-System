@@ -135,6 +135,7 @@ class VerificationStub:
 def default_registry() -> Registry:
     """The stand-ins for Document Intelligence and the Financial Analyst, with the real (M5)
     verifier: it needs no model, so every mode checks findings the same way."""
+    from aeids.agents.report_writer import TemplateWriter
     from aeids.agents.verification import VerificationAgent
 
-    return Registry([DocumentIntelligenceStub(), FinancialAnalystStub(), VerificationAgent()])
+    return Registry([DocumentIntelligenceStub(), FinancialAnalystStub(), VerificationAgent(), TemplateWriter()])

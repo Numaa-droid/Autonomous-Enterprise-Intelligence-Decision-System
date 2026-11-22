@@ -53,6 +53,13 @@ Record each design or library choice in a few lines: what was chosen, what else 
 
 ## Accepted decisions
 
+### D-028 — The answer page: a plain-English summary guarded to checked numbers
+- Date: 2026-11-22
+- Status: accepted
+- Decision: the question page leads with the answer for non-specialists: question, one plain status line, progress steps while running, an **Answer** card (calculated results, figures used with year and page, quotes), a review box only when a person is needed; task graph, findings and timeline fold into "How AEIDS got this answer". `aeids/reporting/answer.py` arranges verified findings into that answer (API `answer` field). A last workflow step, `summarise` (`report_writer`, prompt `rw-v1`), writes 2-4 plain sentences from verified findings only; code checks that every number in them is a checked value as displayed (or a year), retries once naming the offending numbers, else uses a template that restates the checked values. The summary is labelled as written by AI; it adds no fact, so it is not a finding. Without a writer registered (custom registries in tests) the plan has no summarise step. The OpenRouter client now asks again on an empty reply (a reasoning model that returned no text), bounded by `llm_max_retries`.
+- Why: non-technical readers need the answer in words; the number guard keeps rule 2 (no model-made numbers) for prose too.
+- Consequences / follow-ups: the guard checks numbers, not wording; the prompt forbids causes, forecasts and advice. Live: Apple ROE, Apple revenue and margin, Microsoft FCF and D/E, Tesla risks all summarised by AI with every number checked.
+
 ### D-027 — M5 verification: deterministic checks against the parsed tables, bounded rework, human review
 - Date: 2026-11-22
 - Status: accepted

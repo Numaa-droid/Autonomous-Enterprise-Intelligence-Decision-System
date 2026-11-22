@@ -31,6 +31,7 @@ def build_registry(settings: Settings, llm: ChatModel | None = None) -> Registry
         return default_registry()
     from aeids.agents.document_intelligence import DocumentIntelligenceAgent
     from aeids.agents.financial_analyst import FinancialAnalystAgent
+    from aeids.agents.report_writer import ReportWriterAgent
     from aeids.agents.verification import VerificationAgent
 
     closers = []
@@ -40,4 +41,4 @@ def build_registry(settings: Settings, llm: ChatModel | None = None) -> Registry
         client = OpenRouterClient(settings)
         llm, closers = client, [client.close]
     return Registry([DocumentIntelligenceAgent(llm, settings), FinancialAnalystAgent(llm, settings),
-                     VerificationAgent()], closers=closers)
+                     VerificationAgent(), ReportWriterAgent(llm, settings)], closers=closers)

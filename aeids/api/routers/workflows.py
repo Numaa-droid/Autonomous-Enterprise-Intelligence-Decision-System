@@ -52,7 +52,7 @@ def list_all(session: SessionDep, tenant_id: TenantDep) -> list[dict[str, Any]]:
 @router.get("/{workflow_id}", responses={404: {"model": ErrorOut}})
 def get(workflow_id: uuid.UUID, session: SessionDep, tenant_id: TenantDep) -> dict[str, Any]:
     wf = views.get_workflow(session, tenant_id, workflow_id)
-    return {**views.summary(session, wf), "plan": wf.plan, "report": wf.report}
+    return {**views.summary(session, wf), "plan": wf.plan, "report": wf.report, "answer": views.answer(wf.report)}
 
 
 @router.get("/{workflow_id}/tasks", responses={404: {"model": ErrorOut}})

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 from collections import Counter
 from typing import Any
@@ -9,6 +10,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from aeids.reporting.answer import arrange, counts
 from aeids.db.models import (
     AgentRun,
     AgentTask,
@@ -109,9 +111,19 @@ def findings(session: Session, wf: Workflow) -> list[dict[str, Any]]:
     return out
 
 
+def answer(report: dict[str, Any] | None) -> dict[str, Any] | None:
+    """The report as an answer (``aeids.reporting.answer``): a plain-English summary when one was
+    written, then calculated results, the reported figures they rest on, and cited passages."""
+    if not report:
+        return None
+    arranged = arrange(report.get("verified_findings", []))
+    return {"summary": counts(arranged), "text": report.get("summary"), "text_source": report.get("summary_source"),
+            **arranged, "limitations": report.get("limitations", []), "notice": report.get("notice")}
+
+
 def detail(session: Session, wf: Workflow) -> dict[str, Any]:
     events = [{"action": e.action, "details": e.details, "actor": e.actor, "at": aware(e.created_at)}
               for e in session.scalars(select(AuditEvent).where(AuditEvent.resource == f"workflow:{wf.id}")
                                        .order_by(AuditEvent.created_at))]
-    return {**summary(session, wf), "plan": wf.plan, "report": wf.report, "events": events,
+    return {**summary(session, wf), "plan": wf.plan, "report": wf.report, "answer": answer(wf.report), "events": events,
             "tasks": tasks(session, wf), "findings": findings(session, wf)}

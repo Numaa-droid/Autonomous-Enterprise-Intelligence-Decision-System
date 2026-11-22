@@ -303,7 +303,7 @@ function donut(items, { size = 150, thickness = 22, centre, centreSub }) {
 const PAGES = [
   ["overview", "Overview", "Pipeline, activity and service health"],
   ["documents", "Documents", "Every report and the processing state of each version"],
-  ["workflows", "Workflows", "Ask a question; the Supervisor plans, agents work, Verification checks"],
+  ["workflows", "Questions", "Ask about the reports; every number is checked before you see it"],
   ["search", "Search", "Ask a question; see what retrieval returns and why"],
   ["evaluation", "Evaluation", "Retrieval benchmark on the 5-company corpus"],
   ["traces", "Traces", "Every run, step by step: timing, tokens, cost, inputs and outputs"],
@@ -322,8 +322,8 @@ async function render(soft = false) {
   const { page, arg } = route();
   const meta = PAGES.find(([id]) => id === page);
   document.querySelectorAll("#nav a").forEach((a) => a.classList.toggle("active", a.dataset.page === page));
-  $("#page-title").textContent = arg && page === "traces" ? "Trace" : arg && page === "workflows" ? "Workflow" : meta[1];
-  $("#page-crumb").textContent = arg ? `${page === "traces" ? "Trace" : "Workflow"} ${arg.slice(0, 12)}…` : meta[2];
+  $("#page-title").textContent = arg && page === "traces" ? "Trace" : arg && page === "workflows" ? "Question" : meta[1];
+  $("#page-crumb").textContent = arg ? (page === "traces" ? `Trace ${arg.slice(0, 12)}…` : "The answer, and how it was checked") : meta[2];
   if (soft && state.current?.refresh) { try { await state.current.refresh(); } catch (e) { /* keep page */ } return; }
   // quick clicks (page, tenant, theme) can start several renders: only the newest may touch the page
   const seq = (state.renderSeq = (state.renderSeq || 0) + 1);
@@ -723,14 +723,14 @@ function stateTag(map, s) {
 }
 
 async function viewWorkflows(root) {
-  const input = el("input", { type: "search", placeholder: "Ask a question, e.g. What risks does NVIDIA face from US export controls?", "aria-label": "Question" });
+  const input = el("input", { type: "search", placeholder: "e.g. Compare Apple's revenue and operating margin FY2023–FY2025", "aria-label": "Question" });
   const note = el("div");
   const list = el("div");
   const form = el("form", { class: "searchbar", onsubmit: async (e) => {
     e.preventDefault();
     const query = input.value.trim();
     if (query.length < 3) return;
-    note.replaceChildren(notice("info", "Planning the task graph…"));
+    note.replaceChildren(notice("info", "Starting…"));
     try {
       const wf = await api("/workflows", { method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({ tenant: state.tenant, query }) });
@@ -740,21 +740,17 @@ async function viewWorkflows(root) {
   const load = async () => {
     const rows = await api(`/workflows?${tq()}`);
     list.replaceChildren(rows.length ? el("div", { class: "table-wrap" }, el("table", { class: "data" },
-      el("thead", {}, el("tr", {}, el("th", {}, "Status"), el("th", {}, "Question"), el("th", { class: "num" }, "Tasks"),
-        el("th", { class: "num" }, "Verified findings"), el("th", { class: "num" }, "Started"))),
+      el("thead", {}, el("tr", {}, el("th", {}, "Question"), el("th", {}, "Status"), el("th", { class: "num" }, "Asked"))),
       el("tbody", {}, rows.map((w) => el("tr", { class: "click", onclick: () => { location.hash = `#/workflows/${w.id}`; } },
-        el("td", {}, stateTag(WF_STATE, w.status)), el("td", {}, el("b", {}, w.query)),
-        el("td", { class: "num" }, fmtInt(Object.values(w.task_counts).reduce((a, b) => a + b, 0))),
-        el("td", { class: "num" }, fmtInt(w.verified_findings)),
+        el("td", {}, el("b", {}, w.query)), el("td", {}, stateTag(WF_STATE, w.status)),
         el("td", { class: "num muted", title: fmtDate(w.created_at) }, relTime(w.created_at)))))))
-      : empty("workflows", "No workflows yet", "Ask a question above: the Supervisor plans tasks, agents run them, Verification checks every claim."));
+      : empty("workflows", "No questions yet", "Ask one above."));
   };
   append(root, [el("div", { class: "card hero fade-in" },
-    el("h2", {}, "Ask AEIDS"),
-    el("p", {}, "The Supervisor turns your question into a task graph. Document Intelligence collects evidence, the Financial Analyst forms findings, and Verification checks every claim against its source before it can reach the report."),
-    el("div", { style: { marginTop: "16px" } }, form), note,
-    el("div", { class: "small muted", style: { marginTop: "10px" } }, "Document Intelligence reads values from the parsed tables, the Financial Analyst computes with tested code (metric knowledge base), and Verification replays every calculation and checks every value against its table cell. Anything it cannot check waits here for a person.")),
-    card("Recent workflows", state.tenant ? `tenant ${state.tenant}` : null, list)]);
+    el("h2", {}, "Ask about the reports"),
+    el("p", {}, "AEIDS finds the figures in the uploaded reports, does the maths, and checks every number against its page before showing it."),
+    el("div", { style: { marginTop: "16px" } }, form), note),
+    card("Your questions", state.tenant ? `reports of ${state.tenant}` : null, list)]);
   await load();
   input.focus();
   return { refresh: load };
@@ -762,13 +758,23 @@ async function viewWorkflows(root) {
 
 async function viewWorkflow(root, id) {
   const graphBox = el("div", { class: "dag" });
-  const parts = { head: el("div"), graph: card("Task graph", "arrows: depends on · dashed: verifies", graphBox),
-    findings: el("div"), timeline: el("div"), report: el("div"), review: el("div") };
-  append(root, [parts.head, parts.review, parts.graph, el("div", { class: "grid g-2", style: { alignItems: "start" } }, parts.findings, parts.timeline), parts.report]);
+  const parts = { head: el("div"), answer: el("div"), review: el("div"),
+    graph: card("Task graph", "arrows: depends on · dashed: verifies", graphBox),
+    findings: el("div"), timeline: el("div"), report: el("div"), techHead: el("div") };
+  let opened = false;
+  try { opened = localStorage.getItem("aeids.howOpen") === "1"; } catch (e) { /* storage unavailable */ }
+  const how = el("details", { class: "card how", ...(opened ? { open: true } : {}),
+    ontoggle: (e) => { try { localStorage.setItem("aeids.howOpen", e.target.open ? "1" : "0"); } catch (err) { /* ignore */ } } },
+    el("summary", {}, el("b", {}, "How AEIDS got this answer"), el("span", { class: "muted small" }, " · every step, source and check (for auditors)")),
+    parts.techHead, parts.graph,
+    el("div", { class: "grid g-2", style: { alignItems: "start" } }, parts.findings, parts.timeline), parts.report);
+  append(root, [parts.head, parts.review, parts.answer, how]);
   const load = async () => {
     const wf = await api(`/workflows/${encodeURIComponent(id)}?${tq()}`);
     drawHead(parts.head, wf);
     drawReview(parts.review, wf, load);
+    drawAnswer(parts.answer, wf);
+    drawTechHead(parts.techHead, wf);
     drawGraph(graphBox, wf.tasks);
     drawFindings(parts.findings, wf.findings);
     drawTimeline(parts.timeline, wf);
@@ -780,29 +786,90 @@ async function viewWorkflow(root, id) {
   return { refresh: load };
 }
 
+const STEPS = [["extract", "Finding the figures in the reports"], ["verify:extract", "Checking them against their pages"],
+  ["analyse", "Calculating"], ["verify:analyse", "Checking the calculations"]];
+
+function latestTask(tasks, key) {
+  return tasks.filter((t) => t.plan_key === key).sort((a, b) => b.rework_round - a.rework_round)[0];
+}
+
+function plainStatus(wf) {
+  const a = wf.answer;
+  if (wf.status === "COMPLETED") {
+    if (a && (a.results.length || a.reported.length)) return ["good", "check", "Answered. Every number was checked against the report."];
+    if (a && a.passages.length) return ["good", "check", "Answered with quotes from the reports. Each quote was checked against its source."];
+    return ["warning", "alert", "No checked answer could be given. See the notes below."];
+  }
+  if (wf.status === "NEEDS_HUMAN_REVIEW") return ["warning", "alert", "Waiting for you: one step needs a person's decision."];
+  if (wf.status === "FAILED") return ["critical", "x", "This question could not be answered."];
+  if (wf.status === "CANCELLED") return ["muted", "x", "Cancelled."];
+  return ["progress", "spinner", "Working on it… usually under a minute."];
+}
+
 function drawHead(box, wf) {
-  const elapsed = wf.completed_at ? new Date(wf.completed_at) - new Date(wf.created_at) : Date.now() - new Date(wf.created_at);
-  const counts = wf.task_counts;
+  const [cls, ic, text] = plainStatus(wf);
+  const running = !WF_TERMINAL.includes(wf.status);
+  const steps = running ? el("ol", { class: "wf-steps" }, STEPS.map(([key, label]) => {
+    const t = latestTask(wf.tasks, key);
+    const done = t && t.status === "VERIFIED";
+    const active = t && !done && !["PLANNED", "CREATED"].includes(t.status);
+    return el("li", { class: `wf-step${done ? " done" : active ? " active" : ""}` },
+      el("span", { class: "dot" }, done ? icon("check") : active ? icon("spinner") : ""), label);
+  })) : null;
+  const took = wf.completed_at ? ` · took ${fmtMs(new Date(wf.completed_at) - new Date(wf.created_at))}` : "";
   box.replaceChildren(el("div", { class: "card hero fade-in" },
     el("div", { class: "trace-head" },
-      el("a", { href: "#/workflows", class: "btn icon", title: "All workflows", "aria-label": "All workflows" }, icon("back")),
-      el("h2", { style: { flex: "1 1 300px" } }, wf.query), stateTag(WF_STATE, wf.status),
-      el("a", { class: "btn", href: `#/traces/${wf.trace_id}` }, icon("traces"), "Trace")),
-    el("div", { class: "trace-stats" },
-      el("div", {}, el("b", {}, fmtMs(elapsed)), wf.completed_at ? "total time" : "running for"),
-      el("div", {}, el("b", {}, fmtInt(wf.tasks.length)), "tasks"),
-      el("div", {}, el("b", {}, fmtInt(counts.VERIFIED || 0)), "verified"),
-      el("div", {}, el("b", {}, fmtInt(wf.tasks.reduce((a, t) => a + Math.max(0, t.attempts - 1), 0))), "retries"),
-      el("div", {}, el("b", {}, fmtInt(wf.verified_findings)), "verified findings"),
-      el("div", {}, el("b", {}, fmtDate(wf.created_at)), "started"))));
+      el("a", { href: "#/workflows", class: "btn icon", title: "All questions", "aria-label": "All questions" }, icon("back")),
+      el("h2", { style: { flex: "1 1 300px" } }, wf.query)),
+    el("div", { class: `status ${cls}`, style: { fontSize: "15px", marginTop: "8px" } }, icon(ic), text,
+      el("span", { class: "muted", style: { fontWeight: 400 } }, took)),
+    steps));
+}
+
+function drawTechHead(box, wf) {
+  const counts = wf.task_counts;
+  box.replaceChildren(el("div", { class: "trace-stats", style: { margin: "12px 0" } },
+    el("div", {}, el("b", {}, fmtInt(wf.tasks.length)), "tasks"),
+    el("div", {}, el("b", {}, fmtInt(counts.VERIFIED || 0)), "verified"),
+    el("div", {}, el("b", {}, fmtInt(wf.tasks.reduce((s, t) => s + Math.max(0, t.attempts - 1), 0))), "retries"),
+    el("div", {}, el("b", {}, fmtInt(wf.findings.length)), "findings"),
+    el("a", { class: "btn", href: `#/traces/${wf.trace_id}` }, icon("traces"), "Trace")));
+}
+
+function drawAnswer(box, wf) {
+  const a = wf.answer;
+  if (!a) { box.replaceChildren(); return; }
+  const table = (head, rows) => el("div", { class: "table-wrap" }, el("table", { class: "data" },
+    el("thead", {}, el("tr", {}, head.map(([h, cls]) => el("th", cls ? { class: cls } : {}, h)))),
+    el("tbody", {}, rows)));
+  const page = (s) => s.replace(/\.pdf/g, "").replace(/_/g, " ");
+  const blocks = [];
+  if (a.text) blocks.push(el("p", { class: "answer-text" }, a.text),
+    el("div", { class: "small muted", style: { marginBottom: "18px" } }, a.text_source === "ai"
+      ? "Written by AI from the checked figures below. Every number in it was checked." : "Summary of the checked figures below."));
+  if (a.results.length) blocks.push(table([["Result"], ["Value", "num"], ["How"]], a.results.map((r) => el("tr", {},
+    el("td", {}, el("b", {}, r.label)), el("td", { class: "num" }, el("b", { class: "big-value" }, r.value)),
+    el("td", { class: "small muted" }, r.formula || "")))));
+  if (a.reported.length) blocks.push(el("h3", { class: "answer-sub" }, a.results.length ? "Figures used, from the reports" : "From the reports"),
+    table([["Figure"], ["Year"], ["Value", "num"], ["Where"]], a.reported.map((r) => el("tr", {},
+      el("td", {}, r.label), el("td", {}, r.period || "–"),
+      el("td", { class: "num" }, el("b", {}, r.value), r.units ? el("span", { class: "muted" }, ` ${r.units}`) : null),
+      el("td", { class: "small muted" }, page(r.source))))));
+  if (a.passages.length) blocks.push(el("h3", { class: "answer-sub", style: { marginTop: "0" } }, "What the reports say"), a.passages.map((p) => el("div", { class: "evidence" },
+    el("div", { class: "small muted" }, page(p.source)),
+    el("div", { class: "quote" }, p.quote.length > 320 ? p.quote.slice(0, 320) + "…" : p.quote))));
+  if (a.limitations.length) blocks.push(el("div", { class: "answer-note" }, el("b", {}, "Note: "),
+    el("ul", {}, a.limitations.map((l) => el("li", {}, l)))));
+  blocks.push(el("div", { class: "small muted", style: { marginTop: "12px" } }, a.notice || ""));
+  box.replaceChildren(card("Answer", null, blocks));
 }
 
 function drawReview(box, wf, reload) {
   const waiting = wf.tasks.filter((t) => t.status === "NEEDS_HUMAN_REVIEW");
   if (!waiting.length) { box.replaceChildren(); return; }
-  box.replaceChildren(card("Waiting for review", "a person decides; every decision is recorded with your note",
+  box.replaceChildren(card("Your decision is needed", null,
     waiting.map((t) => {
-      const note = el("input", { type: "text", placeholder: "Note (what you checked, or why you reject)", "aria-label": "Review note" });
+      const note = el("input", { type: "text", placeholder: "Optional note", "aria-label": "Note" });
       const open = wf.findings.filter((f) => f.task_id === t.id && ["needs_review", "pending"].includes(f.verification_status));
       const send = async (decision) => {
         try {
@@ -811,16 +878,19 @@ function drawReview(box, wf, reload) {
           await reload();
         } catch (e) { toast(e.message); }
       };
+      const reason = (t.last_error || "This step could not finish.").replace(/^./, (c) => c.toUpperCase());
+      const buttons = open.length
+        ? [el("button", { class: "btn primary", onclick: () => send("approve") }, icon("check"), "Looks right"),
+           el("button", { class: "btn", onclick: () => send("reject") }, icon("x"), "Reject")]
+        : [el("button", { class: "btn primary", onclick: () => send("rerun") }, icon("refresh"), "Try again"),
+           el("button", { class: "btn", onclick: () => send("reject") }, icon("x"), "Stop here")];
       return el("div", { class: "version" },
-        el("div", { class: "version-top" }, el("b", {}, `${t.plan_key} · ${AGENT_LABEL[t.agent] || t.agent}`), stateTag(TASK_STATE, t.status)),
-        el("div", { class: "small muted", style: { margin: "6px 0" } }, t.last_error || `${open.length} finding(s) could not be checked automatically.`),
-        open.length ? el("ul", { class: "small" }, open.map((f) => el("li", {}, f.claim, el("div", { class: "muted" },
-          (f.verifications.at(-1)?.reasons || []).join("; "))))) : null,
-        note,
-        el("div", { style: { display: "flex", gap: "8px", marginTop: "8px", flexWrap: "wrap" } },
-          el("button", { class: "btn primary", onclick: () => send("approve") }, icon("check"), "Approve"),
-          open.length ? null : el("button", { class: "btn", onclick: () => send("rerun") }, "Re-run"),
-          el("button", { class: "btn", onclick: () => send("reject") }, icon("x"), "Reject")));
+        el("div", {}, open.length ? `AEIDS could not check ${open.length} figure(s) automatically. Please look at them:` : reason),
+        open.length ? el("ul", { class: "small", style: { margin: "8px 0" } }, open.map((f) => el("li", {}, f.claim))) : null,
+        el("div", { style: { marginTop: "12px" } }, note),
+        el("div", { style: { display: "flex", gap: "8px", marginTop: "10px", flexWrap: "wrap" } }, buttons),
+        open.length ? null : el("div", { class: "small muted", style: { marginTop: "8px" } },
+          "Upload the missing report on the Documents page, then press “Try again”."));
     })));
 }
 

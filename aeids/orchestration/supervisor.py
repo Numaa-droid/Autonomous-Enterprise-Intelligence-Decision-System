@@ -47,6 +47,7 @@ from aeids.db.models import (
     utcnow,
 )
 from aeids.documents import DocumentError
+from aeids.reporting.answer import verified_findings
 from aeids.orchestration.states import TASK_TERMINAL, WORKFLOW_TERMINAL, move_task, move_workflow
 
 log = logging.getLogger(__name__)
@@ -54,6 +55,7 @@ log = logging.getLogger(__name__)
 T, W = TaskStatus, WorkflowStatus
 ACTOR = "supervisor"
 VERIFICATION_AGENT = "verification"
+WRITER_AGENT = "report_writer"  # optional last step: a plain-English summary of the verified answer (D-028)
 MOVING = {T.QUEUED, T.RUNNING, T.FAILED_RETRYABLE, T.SUCCEEDED, T.VERIFYING, T.CREATED}
 
 
@@ -162,6 +164,11 @@ def create_workflow(session: Session, tenant_id: uuid.UUID, query: str, scope: d
                            resource=f"workflow:{wf.id}", details={"query": query[:500]}))
     move_workflow(session, wf, W.PLANNING, reason="workflow accepted")
     steps = planner.plan(query, scope)
+    if WRITER_AGENT in registry and all(s.agent != WRITER_AGENT for s in steps):
+        steps.append(PlannedStep("summarise", WRITER_AGENT,
+                                 "Write a short plain-English answer from the verified findings",
+                                 {"query": query}, [s.key for s in steps],
+                                 ["Uses only verified findings", "Every number in it is a checked value"]))
     _check_plan(steps, registry)
     tasks: dict[str, AgentTask] = {}
     for s in steps:
@@ -573,26 +580,15 @@ def _wake_at(session: Session, wf: Workflow) -> datetime | None:
 
 def build_report(session: Session, wf: Workflow, tasks: list[AgentTask]) -> dict[str, Any]:
     """Verified findings with their evidence; everything else is a limitation (M7 renders it)."""
-    findings = []
-    for f in session.scalars(select(FindingRecord).where(FindingRecord.workflow_id == wf.id,
-                                                         FindingRecord.verification_status == "verified")):
-        ev = session.execute(
-            select(EvidenceRecord, DocumentVersion.filename)
-            .join(FindingEvidence, FindingEvidence.evidence_record_id == EvidenceRecord.id)
-            .join(DocumentVersion, DocumentVersion.id == EvidenceRecord.version_id)
-            .where(FindingEvidence.finding_id == f.id)).all()
-        calc = session.scalar(select(CalculationRecord).where(CalculationRecord.finding_id == f.id))
-        findings.append({"finding_id": str(f.id), "category": f.category, "claim": f.claim, "value": f.value,
-                         "unit": f.unit, "currency": f.currency, "scale": f.scale, "period": f.period,
-                         "calculation": None if calc is None else {
-                             "function": calc.function, "formula": calc.formula, "inputs": calc.inputs,
-                             "output": calc.output, "calc_version": calc.calc_version},
-                         "evidence": [{"evidence_id": str(e.id), "file": name, "page": e.page,
-                                       "section": e.section, "quote": e.quote[:400]} for e, name in ev]})
+    findings = verified_findings(session, wf.id)
     superseded = {t.parent_task_id for t in tasks if t.parent_task_id}
     limitations = [f"{t.plan_key} ({t.agent_name}) ended {t.status}"
                    + (f": {t.last_error[:200]}" if t.last_error else "")
-                   for t in tasks if t.status != T.VERIFIED.value and t.id not in superseded]
+                   for t in tasks if t.status != T.VERIFIED.value and t.id not in superseded
+                   and t.agent_name != WRITER_AGENT]  # a missing summary is not a gap in the answer
+    writer = next((t for t in tasks if t.agent_name == WRITER_AGENT and t.status == T.VERIFIED.value), None)
+    summary = (writer.output_json or {}).get("summary") if writer else None
+    summary_source = (writer.output_json or {}).get("summary_source") if writer else None
     not_found = [m for t in tasks if t.id not in superseded for m in (t.output_json or {}).get("not_found") or []]
     if not_found:  # values the agents looked for and did not find: said, never estimated
         limitations.append("Not found in the reports: " + ", ".join(dict.fromkeys(not_found)))
@@ -605,7 +601,8 @@ def build_report(session: Session, wf: Workflow, tasks: list[AgentTask]) -> dict
         why = f" ({last.reasons[0][:200]})" if last is not None and last.reasons else ""
         label = "Dropped after verification" if f.verification_status == "rejected" else "Not reviewed"
         limitations.append(f"{label}: {f.claim[:200]}{why}")
-    return {"query": wf.query, "generated_at": utcnow().isoformat(), "verified_findings": findings,
+    return {"query": wf.query, "generated_at": utcnow().isoformat(), "summary": summary,
+            "summary_source": summary_source, "verified_findings": findings,
             "limitations": limitations,
             "notice": "Decision support only: not a legal, financial or compliance determination."}
 

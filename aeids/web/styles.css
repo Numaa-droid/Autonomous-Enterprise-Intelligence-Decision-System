@@ -513,3 +513,25 @@ details.warn ul { margin: 6px 0 0; padding-left: 18px; color: var(--muted); font
   .log-line .lvl { display: none; }
   .heat { grid-template-columns: 40px minmax(0, 1fr) repeat(3, 48px); }
 }
+
+/* ---------- workflow page: answer first, details folded ---------- */
+.wf-steps { list-style: none; display: flex; flex-wrap: wrap; gap: 8px 22px; margin: 14px 0 0; padding: 0; }
+.wf-step { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; }
+.wf-step .dot { width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--axis); display: inline-grid; place-items: center; }
+.wf-step .dot svg { width: 13px; height: 13px; }
+.wf-step.active { color: var(--ink); font-weight: 600; }
+.wf-step.active .dot { border-color: var(--accent-ink); color: var(--accent-ink); }
+.wf-step.active .dot svg { animation: spin 1.2s linear infinite; }
+.wf-step.done { color: var(--ink-2); }
+.wf-step.done .dot { border-color: var(--good); background: var(--good); color: #fff; }
+.big-value { font-size: 1.2em; }
+.answer-sub { margin: 18px 0 8px; font-size: 14px; color: var(--ink-2); font-weight: 600; }
+.answer-note { margin-top: 14px; font-size: 13px; color: var(--ink-2); }
+.answer-note ul { margin: 4px 0 0; padding-left: 18px; }
+details.how > summary { cursor: pointer; list-style: none; padding: 2px 0; }
+details.how > summary::-webkit-details-marker { display: none; }
+details.how > summary::before { content: "▸ "; color: var(--muted); }
+details.how[open] > summary::before { content: "▾ "; }
+details.how[open] > summary { margin-bottom: 8px; }
+details.how .card { box-shadow: none; }
+.answer-text { font-size: 17px; line-height: 1.6; margin: 0 0 6px; max-width: 920px; color: var(--ink); }

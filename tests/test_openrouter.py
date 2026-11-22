@@ -136,8 +136,8 @@ def test_provider_error_inside_200_is_classified() -> None:
 def test_malformed_responses() -> None:
     with pytest.raises(LLMResponseError):
         _client(Fake((200, {"data": [], "model": "m"}))).embed(["x"])
-    with pytest.raises(LLMResponseError):
-        _client(Fake((200, {"choices": []}))).chat([{"role": "user", "content": "hi"}])
+    with pytest.raises(LLMResponseError):  # asked again (bounded), then raised
+        _client(Fake(*[(200, {"choices": []})] * 4)).chat([{"role": "user", "content": "hi"}])
     assert LLMResponseError("empty").retryable  # an empty reply is retried at task level (bounded)
 
 
@@ -210,3 +210,11 @@ def test_embedder_parallel_batches_keep_order_and_sum_usage() -> None:
     assert [v[0] for v in vectors] == [float(i) for i in range(9)]
     assert emb.usage.total_tokens == 9 and emb.dimension == 2
     assert len(seen_threads) > 1
+
+
+def test_an_empty_chat_reply_is_asked_again() -> None:
+    empty = {"choices": [{"message": {"content": None, "reasoning": "thinking..."}, "finish_reason": "stop"}]}
+    sleeps: list[float] = []
+    fake = Fake((200, empty), (200, _chat_body()))
+    result = _client(fake, sleeps).chat([{"role": "user", "content": "hi"}])
+    assert result.attempts == 2 and len(fake.requests) == 2 and len(sleeps) == 1

@@ -89,6 +89,7 @@ class FakeLLM:
         self.plan: Callable[[str], dict] = self.default_plan
         self.picks: Callable[[str], dict] = self.default_picks
         self.calcs: Callable[[str], dict] = self.default_calcs
+        self.summary: Callable[[str], dict] = self.default_summary
         self.raw: list[str] = []  # replies sent verbatim first (e.g. invalid JSON)
 
     def chat(self, messages, *, model=None, temperature=0.0, max_tokens=None, response_format=None, seed=None):
@@ -100,11 +101,22 @@ class FakeLLM:
             content = json.dumps(self.plan(user))
         elif "point at the cells" in system:
             content = json.dumps(self.picks(user))
+        elif "non-specialist reads first" in system:
+            content = json.dumps(self.summary(user))
         else:
             content = "```json\n" + json.dumps(self.calcs(user)) + "\n```"
         return ChatResult(content=content, model="fake/model", finish_reason="stop",
                           usage=Usage(prompt_tokens=90, completion_tokens=10, total_tokens=100,
                                       cost=Decimal("0.0001")), latency_ms=5, attempts=1, response_id="r")
+
+    @staticmethod
+    def default_summary(user: str) -> dict:
+        """A summary that copies the first checked result, as the prompt asks."""
+        for line in user.splitlines():
+            parts = [p.strip() for p in line.split("|")]
+            if parts[0] in ("RESULT", "FIGURE"):
+                return {"summary": f"{parts[1]} was {parts[2] if parts[0] == 'RESULT' else parts[3]}."}
+        return {"summary": "The reports address the question in the passages quoted below."}
 
     @staticmethod
     def default_plan(user: str) -> dict:
@@ -412,7 +424,7 @@ def test_knowledge_base_metrics_with_steps(env: Env, session: Session) -> None:
     # the prompts carried the knowledge base
     plan_user = next(u for s, u in env.llm.prompts if "understand the user's question" in s)
     extract_user = next(u for s, u in env.llm.prompts if "point at the cells" in s)
-    analyse_user = env.llm.prompts[-1][1]
+    analyse_user = next(u for s, u in env.llm.prompts if "Financial Analyst agent" in s)
     assert "KNOWLEDGE BASE" in plan_user and "Energy intensity per rupee of turnover" in plan_user
     assert "printed as: " in extract_user and "Revenue from operations" in extract_user
     assert "roe | Return on equity" in analyse_user and "equity_end later than equity_start" in analyse_user
@@ -457,3 +469,50 @@ def test_an_empty_model_reply_is_retried(env: Env) -> None:
     env.llm.chat = flaky
     wf = _ask(env, "Compare Apple's revenue and operating margin FY2023–FY2025")
     assert wf["status"] == "COMPLETED" and wf["tasks_by_key"]["extract"]["attempts"] == 2
+
+
+def test_the_workflow_carries_an_answer(env: Env) -> None:
+    wf = _ask(env, "Compare Apple's revenue and operating margin FY2023–FY2025")
+    a = wf["answer"]
+    assert a["summary"] == "Verified: 5 calculated results, 6 reported figures."
+    margin = next(r for r in a["results"] if r["label"] == "Apple operating margin, FY2025")
+    assert margin["value"] == "31.97%" and margin["formula"] == "Operating income / revenue × 100"
+    revenue = next(r for r in a["reported"] if r["label"] == "Total net sales" and r["period"] == "FY2025")
+    assert (revenue["company"], revenue["value"], revenue["units"]) == ("Apple Inc.", "$ 416,161", "USD million")
+    assert revenue["source"] == "NASDAQ_AAPL_2025.pdf p. 2" and a["passages"] == []
+    console = env.client.get(f"/api/v1/dashboard/workflows/{wf['id']}?tenant=default").json()
+    assert console["answer"] == a
+
+
+# ---------------- the plain-English summary (D-028) ----------------
+
+def test_the_answer_has_a_plain_summary(env: Env) -> None:
+    wf = _ask(env, "Compare Apple's revenue and operating margin FY2023–FY2025")
+    assert wf["answer"]["text"] == "Apple operating margin, FY2023 was 29.82%." and wf["answer"]["text_source"] == "ai"
+    assert wf["tasks_by_key"]["summarise"]["status"] == "VERIFIED"
+    assert not wf["answer"]["limitations"]
+
+
+def test_a_summary_with_an_unchecked_number_is_replaced(env: Env) -> None:
+    calls = {"n": 0}
+
+    def summary(user: str) -> dict:
+        calls["n"] += 1  # the second try still invents a figure (a rounded "32%" and a made-up change)
+        return {"summary": "Apple's operating margin rose to about 32%, up 2.15 points since FY2023."}
+    env.llm.summary = summary
+    wf = _ask(env, "Compare Apple's revenue and operating margin FY2023–FY2025")
+    assert calls["n"] == 2  # one retry with the offending numbers named
+    retry = [u for s, u in env.llm.prompts if "non-specialist reads first" in s][1]
+    assert "['32', '2.15']" in retry
+    assert wf["answer"]["text_source"] == "template" and "31.97%" in wf["answer"]["text"]
+    assert any("withheld" in w for w in wf["tasks_by_key"]["summarise"]["output"]["warnings"])
+
+
+def test_check_numbers_allows_only_checked_values_and_years() -> None:
+    from aeids.reporting.answer import check_numbers
+
+    arranged = {"results": [{"label": "Apple operating margin, FY2025", "value": "31.97%", "period": "FY2025"}],
+                "reported": [{"company": "Apple Inc.", "label": "Total net sales", "value": "$ 416,161",
+                              "units": "USD million", "period": "FY2025"}], "passages": []}
+    assert check_numbers("In FY2025 (fiscal 2025) the margin was 31.97% on sales of $416,161 million.", arranged) == []
+    assert check_numbers("The margin was 32% on sales of $416.2 billion.", arranged) == ["32", "416.2"]

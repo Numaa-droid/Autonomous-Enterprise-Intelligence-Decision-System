@@ -16,7 +16,7 @@ import logging
 import random
 import time
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal
 from typing import Any
 
@@ -203,13 +203,29 @@ class OpenRouterClient:
             payload["seed"] = seed
         with tracing.span("openrouter.chat", "llm", model=model, temperature=temperature,
                           inputs={"messages": list(messages)}) as sp:
-            result = self._chat(payload, model)
+            result = self._chat_retrying(payload, model)
             sp.set(**_usage_attrs(result.model, result.usage, result.latency_ms, result.attempts),
                    prompt_tokens=result.usage.prompt_tokens,
                    completion_tokens=result.usage.completion_tokens,
                    finish_reason=result.finish_reason)
             sp.set_output({"content": result.content})
             return result
+
+    def _chat_retrying(self, payload: dict[str, Any], model: str) -> ChatResult:
+        """An empty reply (a reasoning model that returned no final text) is asked again, with the
+        same bounded backoff as transport errors, before the task has to be retried."""
+        attempt = 0
+        while True:
+            try:
+                result = self._chat(payload, model)
+                return result if not attempt else replace(result, attempts=result.attempts + attempt)
+            except LLMResponseError as exc:
+                attempt += 1
+                if attempt > self._settings.llm_max_retries:
+                    raise
+                delay = self._delay(attempt, None)
+                log.warning("OpenRouter chat: %s; asking again in %.1fs (%d)", exc.message, delay, attempt)
+                self._sleep(delay)
 
     def _chat(self, payload: dict[str, Any], model: str) -> ChatResult:
         body, attempts, latency = self._post("chat/completions", payload)

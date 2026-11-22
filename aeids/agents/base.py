@@ -122,6 +122,16 @@ class AgentContext:
             version_is_current=bool(version.is_current), document_active=doc_status == DocumentStatus.ACTIVE.value)
             for ev, chunk, version, doc_status in rows}
 
+    def verified_findings(self, workflow_id: uuid.UUID) -> list[dict]:
+        """A workflow's verified findings as the report holds them (for the report writer)."""
+        from aeids.db.models import Workflow
+        from aeids.reporting.answer import verified_findings
+
+        wf = self._session.get(Workflow, workflow_id)
+        if wf is None or wf.tenant_id != self.tenant_id:
+            return []
+        return verified_findings(self._session, workflow_id)
+
     def findings(self, ids: list[uuid.UUID]) -> dict[uuid.UUID, FindingView]:
         """Findings of this tenant as stored: values, cited evidence and calculation."""
         if not ids:
