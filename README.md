@@ -1,15 +1,32 @@
+<p align="center">
+  <img src="assets/banner.svg" alt="AEIDS: answers you can trace to the page. A report's revenue row is cited by a verified finding computed by tested code." width="100%">
+</p>
+
+<p align="center">
+  <img alt="Python 3.11" src="https://img.shields.io/badge/python-3.11-6366f1?style=flat-square">
+  <img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-API%20%2B%20console-22d3ee?style=flat-square">
+  <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-source%20of%20truth-8b5cf6?style=flat-square">
+  <img alt="Qdrant" src="https://img.shields.io/badge/Qdrant-hybrid%20search-2dd4bf?style=flat-square">
+  <img alt="Agents" src="https://img.shields.io/badge/agents-Supervisor%20%C2%B7%20Analyst%20%C2%B7%20Verifier-a78bfa?style=flat-square">
+  <img alt="Status" src="https://img.shields.io/badge/Release%200-M1%E2%80%93M3%20done-22c55e?style=flat-square">
+</p>
+
+<p align="center">
+  <a href="#understanding-the-project"><img alt="1 Understand" src="https://img.shields.io/badge/1-Understand-8b5cf6?style=for-the-badge"></a>
+  <a href="#how-it-works"><img alt="2 How it works" src="https://img.shields.io/badge/2-How%20it%20works-6366f1?style=for-the-badge"></a>
+  <a href="#the-agent-team"><img alt="3 Agents" src="https://img.shields.io/badge/3-Agents-22d3ee?style=for-the-badge"></a>
+  <a href="#why-you-can-trust-the-numbers"><img alt="4 Trust" src="https://img.shields.io/badge/4-Trust-22c55e?style=for-the-badge"></a>
+  <a href="#quick-start"><img alt="5 Run it" src="https://img.shields.io/badge/5-Run%20it-f59e0b?style=for-the-badge"></a>
+</p>
+
 # AEIDS — Autonomous Enterprise Intelligence & Decision System
 
-> **Ask a hard question about a company's annual report. Get an answer in which every claim points to the exact page it came from, every number is computed by tested code (not by the AI), and every claim has been checked by a separate reviewer before you see it.**
+Ask a hard question about a company's annual report, for example *"How dependent is NVIDIA on its largest customers?"* or *"How did Tesla's gross margin change?"*. AEIDS answers it with a small team of AI agents: a **Supervisor** plans the work, specialist agents find the evidence and do the analysis, and a **Verification** agent checks every claim against the source before it can reach the report.
 
-AEIDS reads company documents (annual reports, ESG / BRSR reports) and answers questions about them with a small team of AI agents: a **Supervisor** plans the work, specialist agents do it, and a **Verification** agent checks every claim against the source before it can reach the report. AEIDS is **decision support**, not a final legal, financial or compliance determination.
+What you get back is not a paragraph you have to take on trust. Each claim links to the exact **page, section and quote** it came from, and every number is computed by **tested code, not by the language model**, so anyone can recompute it.
 
-**Contents:** [Understanding the project](#understanding-the-project) · [How it works, in five pictures](#how-it-works-in-five-pictures) · [What an answer looks like](#what-an-answer-looks-like) · [Status](#status) · [Run locally](#run-locally) · [Console](#console-and-run-tracing) · [Workflows](#workflows-ask-a-question) · [Search](#search) · [Tests](#tests)
-
-- Design: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-- What is being built now (Release 0): [docs/MVP_PLAN.md](docs/MVP_PLAN.md)
-- Decisions: [docs/DECISIONS.md](docs/DECISIONS.md)
-- PDF parsing: TableLens, in [`tablelens/`](tablelens/README.md) (copied from `../IntelligencePDF`, D-020)
+> [!NOTE]
+> AEIDS is **decision support**. It does not make final legal, financial or compliance determinations.
 
 ---
 
@@ -17,140 +34,92 @@ AEIDS reads company documents (annual reports, ESG / BRSR reports) and answers q
 
 ### The problem
 
-A company's annual report is 100–300 pages of text, tables and charts. To answer a question like *"How dependent is NVIDIA on its largest customers?"* an analyst has to find the right tables, check the units (thousands? millions? crore?), make sure the year is right, copy the figures out and do the maths. That takes hours, and it is easy to get one detail wrong.
+A company's annual report runs to 100–300 pages of text, tables and charts. To answer one question an analyst has to find the right table, check the units (thousands? millions? crore?), make sure the year is right, copy the figures out and do the maths. That takes hours, and one wrong detail spoils the answer.
 
-A general chatbot is faster, but you cannot trust it with this work. It can make up a number, quote last year's report, mix up two companies or get the arithmetic wrong, and you cannot tell which sentence is the wrong one.
+A general chatbot is faster, but you can't trust it with this work. It can make up a number, quote last year's report, mix up two companies or get the arithmetic wrong, and you can't tell which sentence is the wrong one.
 
 ### What AEIDS does about it
 
-AEIDS works like a small analyst team with a strict reviewer. Each role is a separate, narrowly scoped component:
+AEIDS works like **a small analyst team with a strict auditor**. Every role is a separate, narrowly scoped component, and nothing reaches you until the auditor has checked it against the source.
 
-| In a real analyst team | In AEIDS | What it does |
+| | Typical "chat with your PDF" | AEIDS |
 |---|---|---|
-| Team lead | **Supervisor** | Splits the question into small typed tasks, decides their order, handles retries and rework. The only component that may change task state. |
-| Researcher | **Document Intelligence agent** | Searches the reports and returns exact quotes with page, section and position on the page. |
-| Financial analyst | **Financial Analyst agent** | Turns the extracted figures into ratios, growth rates and comparisons. The arithmetic is done by a deterministic calculation module (`aeids/calc/`, arriving in M4), not by the language model. |
-| Auditor | **Verification agent** | Checks every claim against its source quote. A wrong number or a wrong citation is rejected and sent back for a limited number of rework rounds. |
-| Report writer | **Reporting** | Builds the report from verified findings only, and lists what could not be verified as limitations. |
+| **Sources** | Sometimes a page number, often none | Every finding links to evidence: document version, page, section, quote, and its box on the page where available |
+| **Numbers** | The language model does the arithmetic | Deterministic, tested functions; formula and typed inputs are stored, so any number can be recomputed |
+| **Wrong answers** | Reach you | Rejected by the Verification agent and reworked a limited number of times; what is still unverified is listed as a limitation |
+| **Old reports** | Old and new versions get mixed | Explicit document versions; search uses only the current one by default |
+| **A crash halfway** | Start again | Every state change is saved; the workflow resumes without redoing finished tasks |
+| **Quality** | Hard to measure | A repeatable benchmark ([see results](#does-search-find-the-right-page)) |
 
-### Who it is useful for
+### Who it is for
 
-- **Equity and credit analysts** comparing companies across annual reports.
-- **ESG and compliance teams** mapping what a company has disclosed.
-- **Auditors and consultants**, who have to show where every number came from.
-- **Engineers building AI systems**: AEIDS is a worked example of a multi-agent system you can trust and inspect, with typed contracts, state machines saved to the database, crash-safe workers, tracing and a benchmark.
-
-### How it differs from "chat with your PDF"
-
-| | Typical chatbot over a PDF | AEIDS |
-|---|---|---|
-| Sources | Sometimes a page number, often none | Every finding links to evidence: document version, page, section, quote, and the box on the page where available |
-| Numbers | The language model does the arithmetic and can get it wrong | Deterministic, tested functions; formula, inputs (value, unit, scale, currency, period) and version are stored, so any number can be recomputed |
-| Wrong answers | Reach the user | Rejected by the Verification agent and reworked a limited number of times; whatever is still unverified is listed as a limitation |
-| Old reports | Old and new versions get mixed | Explicit document versions; search uses only the current one by default |
-| A crash halfway through | Start again | Every state change is saved in PostgreSQL; the workflow resumes without redoing finished tasks |
-| Quality | Hard to measure | Retrieval benchmark today; full comparison against a single-agent baseline is planned |
-
-### The rules it never breaks
-
-1. **No evidence, no finding.** A claim without a source quote is not allowed into the report.
-2. **No arithmetic by the language model.** All numbers come from the calculation module.
-3. **Typed messages only.** Agents exchange validated `TaskMessage` / `AgentResult` objects; they never talk to each other directly.
-4. **Document text is data, never instructions.** Text in an uploaded report cannot steer an agent or call a tool.
-5. **Every step is recorded.** Each state change, model call and search is saved and visible in the console.
+| If you are... | AEIDS helps you... |
+|---|---|
+| **An equity or credit analyst** | compare companies across annual reports without copying tables by hand |
+| **On an ESG or compliance team** | map what a company has disclosed, with the page for each point |
+| **An auditor or consultant** | show where every number came from, and how it was computed |
+| **An engineer building AI systems** | study a working multi-agent system with typed contracts, persisted state machines, crash-safe workers, tracing and evaluation |
 
 ---
 
-## How it works, in five pictures
+## How it works
 
-> GitHub draws these diagrams live: hover over a diagram and use the controls to **zoom, pan or open it full screen**. Click any **▶ row** to expand the details.
+<p align="center">
+  <a href="#the-seven-steps-in-detail"><img src="assets/pipeline.svg" alt="Seven steps: upload, parse and index once per report; then plan, investigate, verify and report once per question. Rejected claims go back for rework." width="100%"></a>
+</p>
 
-### 1. The big picture
+Reports are prepared **once**, when they are uploaded: parsed by TableLens (text, tables and charts, each with its page and position), cut into searchable pieces and indexed. Every **question** then runs through the agent team. Click the graphic, or open the sections below, for the details.
 
-A question comes in, the Supervisor turns it into tasks, the agents work on evidence from your documents, and only verified findings reach the report.
+### The seven steps in detail
+
+<details>
+<summary><b>① – ③ &nbsp;Upload, parse, index</b>: how a PDF becomes searchable evidence</summary>
+<br>
+
+| Step | What happens | Where in the code |
+|---|---|---|
+| **Upload** | The PDF is stored and gets a document version. The same file uploaded twice (same checksum) is not processed again. | [`aeids/documents.py`](aeids/documents.py) |
+| **Parse** | A background job sends the PDF to **TableLens**, which finds tables (Table Transformer + docling layout), charts and reading order, keeping page and box for every value. | [`tablelens/`](tablelens/README.md), [`aeids/jobs.py`](aeids/jobs.py) |
+| **Normalise** | Numbers are cleaned up: units, scale (thousand, million, crore), periods, negatives in brackets, totals. | [`aeids/ingestion/`](aeids/ingestion/) |
+| **Chunk** | The report is cut into section-aware pieces of text, tables and charts, each with its page range. | [`aeids/ingestion/`](aeids/ingestion/) |
+| **Index** | Pieces are embedded (`qwen3-embedding-8b`) into Qdrant and indexed for full-text search in PostgreSQL. | [`aeids/ingestion/`](aeids/ingestion/) |
+| **Switch** | Only after the index is verified does the new version become *current*. The old one is kept but no longer searched. | [`aeids/ingestion/`](aeids/ingestion/) |
 
 ```mermaid
 flowchart LR
-    U(["You: a question about<br/>one or more companies"])
-
-    subgraph DATA["Data foundation"]
-        direction TB
-        PDF["Uploaded reports<br/>annual / ESG / BRSR"] --> TL["TableLens parser<br/>text, tables, charts<br/>with page and box"]
-        TL --> IDX[("Search index<br/>Qdrant + PostgreSQL")]
-    end
-
-    subgraph AGENTS["Agent team"]
-        direction TB
-        SUP{{"Supervisor<br/>plans tasks, owns state"}}
-        DI["Document Intelligence<br/>finds and quotes evidence"]
-        FA["Financial Analyst<br/>ratios and growth"]
-        CALC["Calculation module<br/>tested code, no LLM maths"]
-        VER["Verification<br/>checks every claim"]
-        SUP --> DI --> FA
-        FA --- CALC
-        DI --> VER
-        FA --> VER
-        VER -- "rejected: rework" --> SUP
-    end
-
-    REP[["Report<br/>verified findings only,<br/>each with citations"]]
-
-    U --> SUP
-    IDX -. "hybrid search" .-> DI
-    VER -- "verified" --> REP
-    REP --> U
-
-    classDef user fill:#fde68a,stroke:#b45309,color:#111
-    classDef data fill:#bfdbfe,stroke:#1d4ed8,color:#111
-    classDef agent fill:#ddd6fe,stroke:#6d28d9,color:#111
-    classDef check fill:#bbf7d0,stroke:#15803d,color:#111
-    classDef out fill:#fecaca,stroke:#b91c1c,color:#111
-    class U user
-    class PDF,TL,IDX data
-    class SUP,DI,FA,CALC agent
-    class VER check
-    class REP out
-```
-
-### 2. From PDF to searchable evidence
-
-When you upload a report, a background job turns it into small, labelled pieces of text and tables that can be searched by meaning and by exact words. A new version only replaces the old one once it is fully indexed, so search never sees a half-processed report.
-
-```mermaid
-flowchart TB
-    A["Upload PDF<br/>company, type, fiscal year"] --> B{"Same file<br/>already uploaded?"}
-    B -- "yes: same checksum" --> B2["Reuse the existing version"]
-    B -- "no" --> C["New document version<br/>status: pending"]
-    C --> D["TableLens parse on GPU<br/>Table Transformer + docling layout"]
-    D --> E["Financial normalisation<br/>units, scale, periods, negatives, totals"]
-    E --> F["Section-aware chunks<br/>text / table / chart, with page range"]
-    F --> G["Embeddings<br/>qwen3-embedding-8b"]
-    G --> H[("Qdrant vectors<br/>+ PostgreSQL full-text")]
-    H --> I{"Index verified?"}
-    I -- "yes" --> J["Switch: this version is now current<br/>old version kept but not searched"]
-    I -- "no" --> K["Old version stays current<br/>retry from the console"]
-
+    A["Upload PDF"] --> B{"Same checksum?"}
+    B -- "yes" --> B2["Reuse existing version"]
+    B -- "no" --> C["New version: pending"]
+    C --> D["TableLens parse"] --> E["Normalise figures"] --> F["Section-aware chunks"]
+    F --> G["Embeddings + full-text"] --> H{"Index verified?"}
+    H -- "yes" --> J["Becomes current"]
+    H -- "no" --> K["Old version stays current"]
     classDef ok fill:#bbf7d0,stroke:#15803d,color:#111
     classDef warn fill:#fde68a,stroke:#b45309,color:#111
     class J ok
     class K,B2 warn
 ```
 
-<details>
-<summary><b>▶ How search ranks results (hybrid search)</b></summary>
-
-Every question is searched two ways at once:
-
-- **By meaning** (dense vectors in Qdrant): finds *"revenue from top customers"* even when the report says *"concentration of sales"*.
-- **By exact words** (PostgreSQL full-text search): finds exact terms such as *"BRSR"*, *"FY2025"* or a product name.
-
-The two ranked lists are merged with **Reciprocal Rank Fusion (RRF)**: a passage that ranks high in either list rises to the top. Each result is then re-checked in PostgreSQL so it belongs to your tenant and to a *current* document version.
+You can watch each version go `pending → parsing → parsed → indexing → indexed` on the console's Documents page.
 
 </details>
 
-### 3. The life of one question
+<details>
+<summary><b>Search</b>: why AEIDS searches two ways at once</summary>
+<br>
 
-What happens between sending a question and getting a report. Every arrow that changes a task's state is written to PostgreSQL, so a worker crash at any point is safe: the next worker picks up where the last one stopped.
+- **By meaning** (dense vectors in Qdrant) finds *"revenue from top customers"* even when the report says *"concentration of sales"*.
+- **By exact words** (PostgreSQL full-text search) finds exact terms such as *"BRSR"*, *"FY2025"* or a product name.
+
+The two rankings are merged with **Reciprocal Rank Fusion (RRF)**: a passage that ranks high in either list rises to the top. Every result is then re-checked in PostgreSQL so it belongs to your tenant and to a *current* document version. Code: [`aeids/retrieval/`](aeids/retrieval/).
+
+</details>
+
+<details>
+<summary><b>④ – ⑦ &nbsp;Plan, investigate, verify, report</b>: the life of one question, step by step</summary>
+<br>
+
+Every arrow that changes a task's state is written to PostgreSQL, so a worker crash at any point is safe: the next worker picks up where the last one stopped. The diagram is zoomable: hover over it and use the controls.
 
 ```mermaid
 sequenceDiagram
@@ -188,9 +157,57 @@ sequenceDiagram
     API-->>You: report with citations and limitations
 ```
 
-### 4. Every task follows a strict lifecycle
+</details>
 
-A task can only move along these arrows. Any other move raises an error and nothing is written, which is what makes the system predictable and resumable.
+---
+
+## The agent team
+
+<p align="center">
+  <a href="#agents-in-detail"><img src="assets/agents.svg" alt="The Supervisor sends typed tasks to the Document Intelligence, Financial Analyst and Verification agents; only verified findings reach the report; PostgreSQL holds all state." width="100%"></a>
+</p>
+
+Agents never talk to each other. They receive a typed `TaskMessage`, return a typed `AgentResult` and *propose* what should happen next; only the Supervisor decides. That keeps every step checkable, replayable and safe to retry.
+
+### Agents in detail
+
+<details>
+<summary><b>Supervisor</b>: the team lead</summary>
+<br>
+
+Turns your question into the smallest set of verifiable tasks (`extract` → `analyse`, plus a `verify` task for every task with findings), declares their dependencies, and is **the only component allowed to change task or workflow state**. It retries temporary failures with backoff, never retries permission errors, and creates rework tasks for rejected findings. Its `tick` is idempotent, so running it twice never doubles any work. Code: [`aeids/orchestration/supervisor.py`](aeids/orchestration/supervisor.py).
+
+</details>
+
+<details>
+<summary><b>Document Intelligence</b>: the researcher</summary>
+<br>
+
+Runs hybrid search over the current versions of your reports and returns exact quotes with page, section and box. The Supervisor stores a quote as an evidence record **only after checking that the quote really appears in the source text**, so an agent cannot invent a citation.
+
+</details>
+
+<details>
+<summary><b>Financial Analyst</b>: the analyst</summary>
+<br>
+
+Turns extracted figures into ratios, growth rates and comparisons. It **never does arithmetic itself**: every number comes from the deterministic calculation module, and the function, formula, typed inputs (value, unit, scale, currency, period), output and version are stored with the finding. Money is always `Decimal`, never a float.
+
+</details>
+
+<details>
+<summary><b>Verification</b>: the auditor</summary>
+<br>
+
+Checks every finding against its evidence: is the quote in the source, does the value equal its calculation, do units, scale and period agree, is it the current version of the report? A failure is **rejected**, never silently fixed. The Supervisor then creates a rework task carrying the verifier's instructions, for a limited number of rounds.
+
+</details>
+
+<details>
+<summary><b>Task lifecycle</b>: the only moves a task can make</summary>
+<br>
+
+Any move not shown here raises an error and nothing is written. Rules and code: [docs/ARCHITECTURE.md §3.1](docs/ARCHITECTURE.md), [`aeids/orchestration/states.py`](aeids/orchestration/states.py).
 
 ```mermaid
 stateDiagram-v2
@@ -218,43 +235,30 @@ stateDiagram-v2
     FAILED_FINAL --> [*]
 ```
 
-<details>
-<summary><b>▶ Why a rejected task is never re-run, and how rework works</b></summary>
-
-A `REJECTED` task stays rejected, so the record of what went wrong is kept. The Supervisor creates a **new rework task** linked to it (`parent_task_id`, `rework_round + 1`) that carries the verifier's instructions, for example *"the quoted figure is from FY2024, not FY2025"*. Tasks that depended on the rejected one now wait for the rework task instead. When no rework rounds are left, the dependents become `BLOCKED`, and the report lists the gap as a limitation instead of guessing.
-
-The full transition tables for tasks and workflows are in [docs/ARCHITECTURE.md §3.1](docs/ARCHITECTURE.md), and the code that enforces them is [aeids/orchestration/states.py](aeids/orchestration/states.py).
+A rejected task is never re-run, so the record of what went wrong is kept. Its rework task (`parent_task_id`, `rework_round + 1`) takes over its dependents. When no rework rounds are left, the dependents become `BLOCKED` and the report lists the gap as a limitation.
 
 </details>
 
-### 5. Does search find the right page?
-
-Every answer depends on search finding the right page first, so it is measured. The retrieval benchmark asks 31 questions with known answer pages over the annual reports of five companies (Apple, Microsoft, NVIDIA, Tesla, Alphabet). *Recall@5* is the share of questions whose correct page is among the top 5 results.
-
-```mermaid
-xychart-beta
-    title "Recall@5 by search mode (31 questions, 5 annual reports)"
-    x-axis ["Exact words only", "Meaning only", "Hybrid (both)"]
-    y-axis "Recall@5" 0 --> 1
-    bar [0.55, 0.61, 0.77]
-```
-
-| Search mode | Recall@5 | Recall@10 | MRR@10 |
-|---|---|---|---|
-| Exact words only (`keyword`) | 0.55 | 0.81 | 0.37 |
-| Meaning only (`dense`) | 0.61 | 0.81 | 0.53 |
-| **Hybrid (default)** | **0.77** | **0.90** | **0.53** |
-
-Combining both kinds of search finds the right page in the top 5 for about 3 questions in 4, and in the top 10 for 9 in 10. Runs are repeatable (D-023). See [Retrieval benchmark](#retrieval-benchmark) to run it yourself.
-
 ---
 
-## What an answer looks like
+## Why you can trust the numbers
 
-Each finding in a report is a typed object, not free text. The example below is **illustrative** (a made-up company, the format the agents will produce from M4 on): it shows how a single number stays traceable to its calculation, its inputs, and the quoted lines of the report.
+<p align="center">
+  <img src="assets/trust.svg" alt="Illustrative example: revenue on page 87 feeds a stored growth calculation of 12.5%; the finding passes four checks; an injected 13.5% is rejected." width="100%">
+</p>
+
+Every finding is a typed object, not free text. The graphic above is an **illustrative example** (a made-up company) of the format the agents produce from M4 on. Four rules make it trustworthy:
+
+| Rule | What it means in practice |
+|---|---|
+| **No evidence, no finding** | A claim without a stored source quote cannot exist; the contract rejects it. |
+| **No LLM arithmetic** | Numbers come from tested functions, with formula and inputs stored for recomputation. |
+| **Document text is data, never instructions** | Text in an uploaded report cannot steer an agent or call a tool. |
+| **Every step is recorded** | Each state change, model call and search is a trace you can open in the console. |
 
 <details>
-<summary><b>▶ Example finding (JSON)</b></summary>
+<summary><b>See the finding above as JSON</b></summary>
+<br>
 
 ```json
 {
@@ -280,31 +284,101 @@ Each finding in a report is a typed object, not free text. The example below is 
 }
 ```
 
-Note the details: money is a decimal string (never a float), and unit, currency and scale are separate fields, so "4,500 crore INR" cannot be misread as "4,500 million USD".
+Money is a decimal string, never a float, and unit, currency and scale are separate fields, so "4,500 crore INR" cannot be misread as "4,500 million USD".
+
+</details>
+
+### Does search find the right page?
+
+<p align="center">
+  <img src="assets/benchmark.svg" alt="Retrieval benchmark on 31 questions: right page in top 5 / top 10 is 55% / 81% for exact words, 61% / 81% for meaning, 77% / 90% for hybrid search." width="100%">
+</p>
+
+Every answer depends on finding the right page first, so it is measured. Combining both kinds of search finds the right page in the top 5 for about 3 questions in 4, and in the top 10 for 9 in 10. The run is repeatable (D-023); [run it yourself](#retrieval-benchmark).
+
+<details>
+<summary><b>Exact scores</b></summary>
+<br>
+
+| Search mode | Recall@5 | Recall@10 | MRR@10 |
+|---|---|---|---|
+| Exact words only (`keyword`) | 0.55 | 0.81 | 0.37 |
+| Meaning only (`dense`) | 0.61 | 0.81 | 0.53 |
+| **Hybrid (default)** | **0.77** | **0.90** | **0.53** |
+
+</details>
+
+---
+
+## Status
+
+> [!IMPORTANT]
+> **What works today:** uploading reports, versioning, automatic parsing, hybrid search, the Supervisor and its task plan, crash-safe workers, citation verification, tracing and the web console.
+> **Not yet:** the agents inside a workflow are still **stand-ins**. They run real searches and real citation checks, but do not yet extract figures or write analysis. That is milestone M4.
+
+| Milestone | State |
+|---|---|
+| M1 Foundation: upload, versioning, checksum dedupe, data-foundation tables | ✅ done |
+| M2 Ingestion and retrieval: TableLens parse → normalised tables → chunks → embeddings + Qdrant → hybrid search; retrieval benchmark | ✅ done |
+| Tracing + console: LangSmith-style traces in Postgres, web console at `/ui` (D-022) | ✅ done |
+| M3 Contracts and Supervisor: typed agent messages, task/workflow state machines, Supervisor with retries and rework, crash-safe workers, workflow API and console page (D-024) | ✅ done |
+| M4 LLM Document Intelligence and Financial Analyst, calculation module | ⏳ next |
+| M5–M7 Report output, single-agent RAG baseline, full benchmark (AEIDS vs baseline) | ⬜ planned |
+
+## Quick start
+
+```bash
+git clone https://github.com/Numaa-droid/Autonomous-Enterprise-Intelligence-Decision-System.git
+cd Autonomous-Enterprise-Intelligence-Decision-System
+uv venv --python 3.11 .venv && uv pip install --python .venv/bin/python -r requirements.txt
+cp .env.example .env        # set AEIDS_DB_PASSWORD (and the same in AEIDS_DATABASE_URL), AEIDS_OPENROUTER_API_KEY
+./start.sh                  # Postgres, Qdrant, Redis, migrations, TableLens, API and worker
+```
+
+Then open **http://127.0.0.1:8001/ui**: upload a report on **Documents**, ask a question on **Workflows**, and watch every step on **Traces**.
+
+> [!WARNING]
+> The console has no login. Keep the API bound to `127.0.0.1`.
+
+<details>
+<summary><b>FAQ</b></summary>
+<br>
+
+**Is this just RAG?** Search (retrieval) is one step. On top of it, AEIDS plans typed tasks, keeps arithmetic out of the language model, verifies every claim against its source, and saves every state change so a workflow can resume and be audited.
+
+**Which documents does it handle?** Annual reports and ESG / BRSR reports as PDFs, native or scanned (TableLens uses a GPU model for scans and charts).
+
+**Which models does it use?** Embeddings `qwen/qwen3-embedding-8b` and LLM `qwen/qwen3.8-flash`, both through OpenRouter. All calls go through one module with retries, cost and latency tracking. Tests never call the network.
+
+**Does my data leave my machine?** Original files and the database stay local. Chunk text is sent to OpenRouter to compute embeddings, and to the LLM when agents run.
+
+**Can it give investment or legal advice?** No. It is decision support: it finds, computes and cites, and a person decides.
 
 </details>
 
 <details>
-<summary><b>▶ Glossary</b></summary>
+<summary><b>Glossary</b></summary>
+<br>
 
 | Term | Meaning |
 |---|---|
 | **Agent** | A component with one narrow job (find evidence, analyse, verify) that receives a typed task and returns a typed result. |
-| **Supervisor** | The planner and the only component allowed to change task or workflow state. |
+| **Supervisor** | The planner, and the only component allowed to change task or workflow state. |
 | **Workflow** | One question and everything done to answer it: its task graph, results and report. |
 | **Evidence record** | A stored quote from a specific document version, page and section, with its box on the page where available. |
-| **Finding** | A claim plus its evidence (and calculation, for numbers). No evidence, no finding. |
+| **Finding** | A claim plus its evidence (and its calculation, for numbers). No evidence, no finding. |
 | **Document version** | Each upload of a report. Only the *current* version is searched by default; old ones are kept. |
 | **Chunk** | A searchable piece of a report: a section of text, a table or a chart, with its page range. |
 | **Hybrid search / RRF** | Searching by meaning and by exact words, then merging the two rankings with Reciprocal Rank Fusion. |
-| **Lease** | A time limit on a worker's claim on a task; if the worker dies, the task is queued again after the lease expires. |
-| **Idempotency key** | A unique key per task so that a restarted workflow never runs finished work twice. |
-| **TableLens** | The PDF parser (in `tablelens/`) that finds tables, charts and reading order, and keeps page and position for every value. |
+| **Lease** | A time limit on a worker's claim on a task; if the worker dies, the task is queued again when the lease expires. |
+| **Idempotency key** | A unique key per task, so a restarted workflow never runs finished work twice. |
+| **TableLens** | The PDF parser in `tablelens/` that finds tables, charts and reading order, and keeps the page and position of every value. |
 
 </details>
 
 <details>
-<summary><b>▶ Where things are in the code</b></summary>
+<summary><b>Where things are in the code</b></summary>
+<br>
 
 | Folder | What is in it |
 |---|---|
@@ -316,25 +390,14 @@ Note the details: money is a decimal string (never a float), and unit, currency 
 | [`aeids/orchestration/`](aeids/orchestration/) | Supervisor, state machines, workers with leases |
 | [`aeids/agents/`](aeids/agents/) | The agents (stand-ins until M4) |
 | [`aeids/llm/`](aeids/llm/) | The single entry point for model calls (OpenRouter), with retries and cost tracking |
-| [`tablelens/`](tablelens/) | PDF parsing pipeline, run as its own service |
+| [`tablelens/`](tablelens/README.md) | PDF parsing pipeline, run as its own service |
 | [`eval/`](eval/) | Benchmark questions, corpus list and runners |
-| [`docs/`](docs/) | Architecture, MVP plan, decision log |
+| [`docs/`](docs/) | [Architecture](docs/ARCHITECTURE.md), [MVP plan](docs/MVP_PLAN.md), [decision log](docs/DECISIONS.md) |
+| [`assets/`](assets/) | README graphics |
 
 </details>
 
 ---
-
-## Status
-
-What works today: uploading reports, versioning, automatic parsing, hybrid search, the Supervisor with its task plan, crash-safe workers, verification of citations, tracing and the web console. The agents inside a workflow are still **stand-ins**: they run real searches and real citation checks, but do not yet extract figures or write analysis. That is the next milestone (M4).
-
-| Milestone | State |
-|---|---|
-| M1 Foundation: upload, versioning, checksum dedupe, data-foundation tables | done |
-| M2 Ingestion and retrieval | done: TableLens parse → normalised tables → chunks → embeddings + Qdrant → hybrid search; retrieval benchmark |
-| Tracing + console | done: LangSmith-style traces in Postgres, web console at `/ui` (D-022) |
-| M3 Contracts and Supervisor | done: typed agent messages, task/workflow state machines, Supervisor with retries and rework, crash-safe workers, workflow API and console page (D-024) |
-| M4–M7 | not started: LLM Document Intelligence and Financial Analyst, calculation module, report output, single-agent baseline and full benchmark |
 
 ## Run locally
 

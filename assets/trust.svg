@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="560" viewBox="0 0 1280 560" role="img" aria-labelledby="t d">
+  <title id="t">From a claim back to the page</title>
+  <desc id="d">Illustrative example: a revenue figure on page 87 feeds a stored calculation; the finding is verified against the quote and the calculation, and an injected wrong number is rejected.</desc>
+  <defs>
+    <linearGradient id="grad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#a78bfa"/><stop offset=".45" stop-color="#6366f1"/><stop offset="1" stop-color="#22d3ee"/></linearGradient>
+    <linearGradient id="gradH" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#a78bfa"/><stop offset=".5" stop-color="#6366f1"/><stop offset="1" stop-color="#22d3ee"/></linearGradient>
+    <linearGradient id="gradV" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a78bfa"/><stop offset="1" stop-color="#6366f1"/></linearGradient>
+    <linearGradient id="gradC" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#67e8f9"/><stop offset="1" stop-color="#0891b2"/></linearGradient>
+    <radialGradient id="glowV" cx=".08" cy="-.05" r=".7"><stop offset="0" stop-color="#8b5cf6" stop-opacity=".35"/><stop offset="1" stop-color="#8b5cf6" stop-opacity="0"/></radialGradient>
+    <radialGradient id="glowC" cx="1" cy=".1" r=".6"><stop offset="0" stop-color="#22d3ee" stop-opacity=".2"/><stop offset="1" stop-color="#22d3ee" stop-opacity="0"/></radialGradient>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="#94a3b8" stroke-opacity=".07"/></pattern>
+    <linearGradient id="fadeGrid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <mask id="gridMask"><rect width="1280" height="560" fill="url(#fadeGrid)"/></mask>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#000" flood-opacity=".5"/></filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#22d3ee"/></marker>
+    <marker id="arrowV" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#c4b5fd"/></marker>
+    <marker id="arrowR" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#f43f5e"/></marker>
+    <marker id="arrowG" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#22c55e"/></marker>
+    <style>
+      .sans{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+      .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace}
+      .flow{stroke-dasharray:6 7;animation:flow 1.1s linear infinite}
+      @keyframes flow{to{stroke-dashoffset:-26}}
+      .pulse{animation:pulse 2.4s ease-in-out infinite}
+      @keyframes pulse{0%,100%{opacity:.45}50%{opacity:1}}
+      .grow{transform-box:fill-box;transform-origin:50% 100%;animation:grow 1.1s cubic-bezier(.2,.8,.2,1) both}
+      @keyframes grow{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+      .pop{transform-box:fill-box;transform-origin:50% 50%;animation:pop 2.8s ease-in-out infinite}
+      @keyframes pop{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+      @media (prefers-reduced-motion:reduce){.flow,.pulse,.grow,.pop{animation:none}}
+    </style>
+  </defs>
+  <rect width="1280" height="560" rx="24" fill="#060a14"/>
+  <rect width="1280" height="560" rx="24" fill="url(#glowV)"/>
+  <rect width="1280" height="560" rx="24" fill="url(#glowC)"/>
+  <rect width="1280" height="560" rx="24" fill="url(#grid)" mask="url(#gridMask)"/>
+  <rect x=".5" y=".5" width="1279" height="559" rx="24" fill="none" stroke="#94a3b8" stroke-opacity=".18"/>
+
+<text class="sans" x="48.0" y="70.0" font-size="30" fill="#e7ecf6" font-weight="800" letter-spacing="-.6">Every number can be traced and recomputed</text><text class="sans" x="48.0" y="100.0" font-size="15.5" fill="#8d99b3">Illustrative example with a made-up company. Nothing reaches the report until it matches its source.</text>
+<text class="sans" x="48.0" y="150.0" font-size="12" fill="#67e8f9" font-weight="700" letter-spacing="1.4">1 · SOURCE</text>
+<text class="sans" x="448.0" y="150.0" font-size="12" fill="#c4b5fd" font-weight="700" letter-spacing="1.4">2 · CALCULATION</text>
+<text class="sans" x="872.0" y="150.0" font-size="12" fill="#86efac" font-weight="700" letter-spacing="1.4">3 · VERIFIED FINDING</text>
+<g filter="url(#shadow)"><rect x="48" y="166" width="340" height="300" rx="12" fill="#f8fafc"/></g>
+<rect x="68" y="188" width="26" height="26" rx="7" fill="url(#grad)"/>
+<rect x="104" y="191" width="126" height="9" rx="4.5" fill="#cbd5e1"/>
+<rect x="104" y="206" width="84" height="7" rx="3.5" fill="#e2e8f0"/>
+<rect x="308" y="191" width="60" height="7" rx="3.5" fill="#e2e8f0"/>
+<line x1="68" y1="228" x2="368" y2="228" stroke="#e2e8f0"/>
+<text class="sans" x="68.0" y="254.0" font-size="11" fill="#334155" font-weight="800" letter-spacing="1">PROFIT AND LOSS</text>
+<text class="sans" x="368.0" y="254.0" font-size="9.5" fill="#64748b" text-anchor="end">₹ crore</text>
+<rect x="68" y="266" width="300" height="22" fill="#eef2ff"/>
+<text class="sans" x="74.0" y="281.0" font-size="9.5" fill="#475569" font-weight="700">Particulars</text>
+<text class="sans" x="276.0" y="281.0" font-size="9.5" fill="#475569" font-weight="700" text-anchor="end">FY25</text>
+<text class="sans" x="362.0" y="281.0" font-size="9.5" fill="#475569" font-weight="700" text-anchor="end">FY24</text>
+<rect class="pulse" x="64" y="290" width="308" height="22" rx="4" fill="#22d3ee" fill-opacity=".14" stroke="#22d3ee" stroke-width="1.6" stroke-dasharray="4 3"/>
+<text class="sans" x="74.0" y="305.0" font-size="9.5" fill="#334155" font-weight="700">Revenue from operations</text>
+<text class="sans" x="276.0" y="305.0" font-size="9.5" fill="#0f172a" font-weight="700" text-anchor="end">4,500</text>
+<text class="sans" x="362.0" y="305.0" font-size="9.5" fill="#334155" font-weight="700" text-anchor="end">4,000</text>
+<line x1="68" y1="312" x2="368" y2="312" stroke="#eef2f7"/>
+<text class="sans" x="74.0" y="329.0" font-size="9.5" fill="#334155">Other income</text>
+<text class="sans" x="276.0" y="329.0" font-size="9.5" fill="#0f172a" text-anchor="end">120</text>
+<text class="sans" x="362.0" y="329.0" font-size="9.5" fill="#334155" text-anchor="end">95</text>
+<line x1="68" y1="336" x2="368" y2="336" stroke="#eef2f7"/>
+<text class="sans" x="74.0" y="353.0" font-size="9.5" fill="#334155">Total expenses</text>
+<text class="sans" x="276.0" y="353.0" font-size="9.5" fill="#0f172a" text-anchor="end">3,610</text>
+<text class="sans" x="362.0" y="353.0" font-size="9.5" fill="#334155" text-anchor="end">3,280</text>
+<line x1="68" y1="360" x2="368" y2="360" stroke="#eef2f7"/>
+<text class="sans" x="74.0" y="377.0" font-size="9.5" fill="#334155">Profit before tax</text>
+<text class="sans" x="276.0" y="377.0" font-size="9.5" fill="#0f172a" text-anchor="end">1,010</text>
+<text class="sans" x="362.0" y="377.0" font-size="9.5" fill="#334155" text-anchor="end">815</text>
+<line x1="68" y1="384" x2="368" y2="384" stroke="#eef2f7"/>
+<text class="sans" x="74.0" y="401.0" font-size="9.5" fill="#334155">Tax expense</text>
+<text class="sans" x="276.0" y="401.0" font-size="9.5" fill="#0f172a" text-anchor="end">255</text>
+<text class="sans" x="362.0" y="401.0" font-size="9.5" fill="#334155" text-anchor="end">205</text>
+<line x1="68" y1="408" x2="368" y2="408" stroke="#eef2f7"/>
+<text class="sans" x="74.0" y="425.0" font-size="9.5" fill="#334155" font-weight="700">Profit for the year</text>
+<text class="sans" x="276.0" y="425.0" font-size="9.5" fill="#0f172a" font-weight="700" text-anchor="end">755</text>
+<text class="sans" x="362.0" y="425.0" font-size="9.5" fill="#334155" font-weight="700" text-anchor="end">610</text>
+<line x1="68" y1="432" x2="368" y2="432" stroke="#eef2f7"/>
+<text class="sans" x="368.0" y="452.0" font-size="9.5" fill="#94a3b8" text-anchor="end">p. 87</text>
+<rect x="448" y="166" width="372" height="300" rx="16" fill="#0d1424" stroke="#8b5cf6" stroke-opacity=".45" filter="url(#shadow)"/>
+<text class="mono" x="470.0" y="206.0" font-size="19" fill="#c4b5fd" font-weight="700">growth_rate</text>
+<text class="mono" x="798.0" y="206.0" font-size="11.5" fill="#8d99b3" text-anchor="end">calc v1.0</text>
+<rect x="466" y="230" width="336" height="36" rx="10" fill="#111a2e" stroke="#94a3b8" stroke-opacity=".18"/>
+<text class="mono" x="480.0" y="253.0" font-size="12" fill="#8d99b3">current</text>
+<text class="mono" x="560.0" y="253.0" font-size="14" fill="#e7ecf6" font-weight="700">4500</text>
+<rect x="612.0" y="237" width="35" height="22" rx="11.0" fill="#22d3ee" fill-opacity=".13" stroke="#22d3ee" stroke-opacity=".5"/><text class="sans" x="629.4" y="252.0" font-size="11" fill="#67e8f9" font-weight="600" text-anchor="middle">INR</text>
+<rect x="652.8" y="237" width="47" height="22" rx="11.0" fill="#2dd4bf" fill-opacity=".13" stroke="#2dd4bf" stroke-opacity=".5"/><text class="sans" x="676.5" y="252.0" font-size="11" fill="#5eead4" font-weight="600" text-anchor="middle">crore</text>
+<rect x="706.2" y="237" width="54" height="22" rx="11.0" fill="#8b5cf6" fill-opacity=".13" stroke="#8b5cf6" stroke-opacity=".5"/><text class="sans" x="733.0" y="252.0" font-size="11" fill="#c4b5fd" font-weight="600" text-anchor="middle">FY2025</text>
+<rect x="466" y="276" width="336" height="36" rx="10" fill="#111a2e" stroke="#94a3b8" stroke-opacity=".18"/>
+<text class="mono" x="480.0" y="299.0" font-size="12" fill="#8d99b3">previous</text>
+<text class="mono" x="560.0" y="299.0" font-size="14" fill="#e7ecf6" font-weight="700">4000</text>
+<rect x="612.0" y="283" width="35" height="22" rx="11.0" fill="#22d3ee" fill-opacity=".13" stroke="#22d3ee" stroke-opacity=".5"/><text class="sans" x="629.4" y="298.0" font-size="11" fill="#67e8f9" font-weight="600" text-anchor="middle">INR</text>
+<rect x="652.8" y="283" width="47" height="22" rx="11.0" fill="#2dd4bf" fill-opacity=".13" stroke="#2dd4bf" stroke-opacity=".5"/><text class="sans" x="676.5" y="298.0" font-size="11" fill="#5eead4" font-weight="600" text-anchor="middle">crore</text>
+<rect x="706.2" y="283" width="54" height="22" rx="11.0" fill="#8b5cf6" fill-opacity=".13" stroke="#8b5cf6" stroke-opacity=".5"/><text class="sans" x="733.0" y="298.0" font-size="11" fill="#c4b5fd" font-weight="600" text-anchor="middle">FY2024</text>
+<text class="mono" x="470.0" y="352.0" font-size="15" fill="#a9b4cc">(4500 − 4000) / 4000 × 100</text>
+<text class="sans" x="470.0" y="398.0" font-size="34" fill="url(#gradH)" font-weight="800">= 12.5 %</text>
+<text class="sans" x="470.0" y="432.0" font-size="12.5" fill="#8d99b3">Function, inputs and version are stored,</text>
+<text class="sans" x="470.0" y="450.0" font-size="12.5" fill="#8d99b3">so anyone can recompute the number.</text>
+<rect x="872" y="166" width="360" height="300" rx="16" fill="#0d1424" stroke="#22c55e" stroke-opacity=".45" filter="url(#shadow)"/>
+<text class="sans" x="894.0" y="210.0" font-size="22" fill="#e7ecf6" font-weight="800">Revenue grew 12.5%</text>
+<text class="sans" x="894.0" y="234.0" font-size="13" fill="#8d99b3">FY2024 → FY2025 · Acme Ltd</text>
+<circle cx="905" cy="271" r="11" fill="#22c55e" fill-opacity=".16" stroke="#22c55e" stroke-opacity=".6"/>
+<path d="M900 271l3.5 3.5 6.5-7" fill="none" stroke="#86efac" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<text class="sans" x="926.0" y="276.0" font-size="14" fill="#e7ecf6">Quote found on page 87</text>
+<circle cx="905" cy="307" r="11" fill="#22c55e" fill-opacity=".16" stroke="#22c55e" stroke-opacity=".6"/>
+<path d="M900 307l3.5 3.5 6.5-7" fill="none" stroke="#86efac" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<text class="sans" x="926.0" y="312.0" font-size="14" fill="#e7ecf6">Value equals the calculation</text>
+<circle cx="905" cy="343" r="11" fill="#22c55e" fill-opacity=".16" stroke="#22c55e" stroke-opacity=".6"/>
+<path d="M900 343l3.5 3.5 6.5-7" fill="none" stroke="#86efac" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<text class="sans" x="926.0" y="348.0" font-size="14" fill="#e7ecf6">Units, scale and period agree</text>
+<circle cx="905" cy="379" r="11" fill="#22c55e" fill-opacity=".16" stroke="#22c55e" stroke-opacity=".6"/>
+<path d="M900 379l3.5 3.5 6.5-7" fill="none" stroke="#86efac" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<text class="sans" x="926.0" y="384.0" font-size="14" fill="#e7ecf6">Current version of the report</text>
+<g class="pop"><rect x="894" y="418" width="118" height="30" rx="15" fill="#22c55e" fill-opacity=".15" stroke="#22c55e" stroke-opacity=".6"/><text class="sans" x="953.0" y="437.5" font-size="12.5" fill="#86efac" font-weight="700" text-anchor="middle" letter-spacing=".6">✓ VERIFIED</text></g>
+<path class="flow" d="M374 301 C 402 301, 412 286, 442 286" fill="none" stroke="#22d3ee" stroke-width="2" marker-end="url(#arrow)"/>
+<path class="flow" d="M824 388 C 850 388, 842 206, 866 206" fill="none" stroke="#c4b5fd" stroke-width="2" marker-end="url(#arrowV)"/>
+<rect x="48" y="494" width="1184" height="40" rx="12" fill="#f43f5e" fill-opacity=".1" stroke="#f43f5e" stroke-opacity=".5"/>
+<text class="sans" x="70.0" y="519.5" font-size="12" fill="#fda4af" font-weight="800" letter-spacing="1.2">✗  INJECTED TEST</text>
+<text class="sans" x="216.0" y="519.5" font-size="13.5" fill="#fecdd3">A finding that claims 13.5% does not equal its calculation (12.5%), so it is rejected and a rework task is created.</text>
+</svg>
