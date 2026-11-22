@@ -16,6 +16,7 @@ from aeids.calc.functions import (
     average,
     cagr,
     days,
+    display_points,
     difference,
     display,
     fiscal_year,
@@ -31,6 +32,6 @@ from aeids.calc.functions import (
 __all__ = [
     "CALC_VERSION", "FUNCTIONS", "LIST_INPUTS", "CalcError", "CalcResult", "CurrencyMismatch", "DivisionByZero",
     "MissingInput", "PeriodMismatch", "ScaleMismatch", "UnitMismatch", "absolute", "average", "cagr", "days",
-    "difference", "display",
+    "difference", "display", "display_points",
     "fiscal_year", "intensity", "margin", "normalize_scale", "pct_change", "ratio", "run", "sum_values",
 ]

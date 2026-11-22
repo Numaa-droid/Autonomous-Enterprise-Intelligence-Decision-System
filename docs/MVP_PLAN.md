@@ -66,6 +66,7 @@ Build vertically: get one question flowing end to end before polishing any singl
 - `rejected` → Supervisor creates a rework task (bounded: max 2 rework rounds; see `ARCHITECTURE.md` §3.1 Rework)
 - Fault-injection tests: wrong number, wrong page, superseded version, unit mismatch, scale mismatch, wrong period
 - **Done when:** all injected faults are caught in tests.
+- **Status:** done (D-027). `tests/test_verification_m5.py`: every injected fault is rejected with its reason and reworked; human review endpoint and console panel.
 
 ### M6 — Baseline and benchmark
 - Single-agent RAG baseline: same retrieval, same LLM, one prompt, answer with citations

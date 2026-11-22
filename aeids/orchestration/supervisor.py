@@ -489,10 +489,20 @@ def _pass(session: Session, wf: Workflow, settings: Settings, now: datetime,
                     move_task(session, t, T.NEEDS_HUMAN_REVIEW, reason="a finding needs human review",
                               actor=ACTOR)
                 elif "rejected" in kinds:
-                    t.last_error = " ".join(d.rework_instructions or "; ".join(d.reasons)
-                                            for d in decisions if d.decision == "rejected")[:4000]
-                    move_task(session, t, T.REJECTED, reason=f"verification rejected: {t.last_error[:300]}",
-                              actor=ACTOR)
+                    rejected = [d for d in decisions if d.decision == "rejected"]
+                    t.last_error = " ".join(dict.fromkeys(
+                        f"{'; '.join(d.reasons[:3])}. {d.rework_instructions or ''}".strip()
+                        for d in rejected))[:4000]
+                    if t.rework_round >= settings.workflow_max_rework_rounds and "verified" in kinds:
+                        # no rounds left: the rejected findings are dropped, the verified ones stand
+                        t.output_json = {**(t.output_json or {}),
+                                         "dropped_findings": [str(d.finding_id) for d in rejected]}
+                        move_task(session, t, T.VERIFIED, actor=ACTOR,
+                                  reason=f"{len(rejected)} rejected finding(s) dropped after {t.rework_round} "
+                                         f"rework round(s); the verified ones stand")
+                    else:
+                        move_task(session, t, T.REJECTED, reason=f"verification rejected: {t.last_error[:300]}",
+                                  actor=ACTOR)
                 else:
                     move_task(session, t, T.VERIFIED, reason="every finding verified", actor=ACTOR)
                 return True
@@ -586,6 +596,15 @@ def build_report(session: Session, wf: Workflow, tasks: list[AgentTask]) -> dict
     not_found = [m for t in tasks if t.id not in superseded for m in (t.output_json or {}).get("not_found") or []]
     if not_found:  # values the agents looked for and did not find: said, never estimated
         limitations.append("Not found in the reports: " + ", ".join(dict.fromkeys(not_found)))
+    live = [t.id for t in tasks if t.id not in superseded and t.agent_name != VERIFICATION_AGENT]
+    for f in session.scalars(select(FindingRecord).where(
+            FindingRecord.workflow_id == wf.id, FindingRecord.task_id.in_(live),
+            FindingRecord.verification_status.in_(("rejected", "needs_review"))).order_by(FindingRecord.created_at)):
+        last = session.scalar(select(VerificationResult).where(VerificationResult.finding_id == f.id)
+                              .order_by(VerificationResult.verified_at.desc()).limit(1))
+        why = f" ({last.reasons[0][:200]})" if last is not None and last.reasons else ""
+        label = "Dropped after verification" if f.verification_status == "rejected" else "Not reviewed"
+        limitations.append(f"{label}: {f.claim[:200]}{why}")
     return {"query": wf.query, "generated_at": utcnow().isoformat(), "verified_findings": findings,
             "limitations": limitations,
             "notice": "Decision support only: not a legal, financial or compliance determination."}
@@ -600,6 +619,67 @@ def _finish_root_span(session: Session, wf: Workflow) -> None:
         root.status = "ok" if wf.status == W.COMPLETED.value else "error"
         root.outputs = {"status": wf.status,
                         "verified_findings": len((wf.report or {}).get("verified_findings", []))}
+
+
+class ReviewNotAllowed(DocumentError):
+    code = "review_not_allowed"
+    http_status = 409
+
+
+REVIEW_DECISIONS = ("approve", "reject", "rerun")
+
+
+def review(session: Session, workflow_id: uuid.UUID, tenant_id: uuid.UUID, task_id: uuid.UUID, *,
+           decision: str, note: str, reviewer: str) -> AgentTask:
+    """A person decides on a task waiting in NEEDS_HUMAN_REVIEW (ARCHITECTURE.md §3.1):
+
+    * ``approve``: its findings still awaiting a decision become verified; the task VERIFIED;
+    * ``reject``: those findings become rejected; the task FAILED_FINAL;
+    * ``rerun``: the task is QUEUED again with one more attempt. Only for a task without findings
+      (e.g. blocked because a report was missing and has since been uploaded): re-running a task
+      with findings would duplicate them; reject it instead.
+
+    The decision is recorded on every finding it touches (``verification_results``), in the task's
+    transitions and in the audit log. Call ``tick`` afterwards."""
+    if decision not in REVIEW_DECISIONS:
+        raise ReviewNotAllowed(f"decision must be one of {', '.join(REVIEW_DECISIONS)}")
+    wf = session.scalar(select(Workflow).where(Workflow.id == workflow_id, Workflow.tenant_id == tenant_id)
+                        .with_for_update())
+    if wf is None:
+        raise WorkflowNotFound("workflow not found")
+    task = session.scalar(select(AgentTask).where(AgentTask.id == task_id, AgentTask.workflow_id == wf.id))
+    if task is None:
+        raise WorkflowNotFound("task not found in this workflow")
+    if task.status != T.NEEDS_HUMAN_REVIEW.value:
+        raise ReviewNotAllowed(f"task {task.plan_key} is {task.status}; only a task waiting for review can be reviewed")
+    actor = f"reviewer:{reviewer}"[:100]
+    note = note.strip()[:2000]
+    reason = f"{decision} by {reviewer}" + (f": {note}" if note else "")
+    open_findings = list(session.scalars(select(FindingRecord).where(
+        FindingRecord.task_id == task.id, FindingRecord.verification_status.in_(("needs_review", "pending")))))
+    if decision == "rerun":
+        if _has_findings(session, task):
+            raise ReviewNotAllowed("this task has findings: re-running it would duplicate them; approve or reject it")
+        task.max_attempts = max(task.max_attempts, task.attempts + 1)
+        task.next_attempt_at = None
+        move_task(session, task, T.QUEUED, reason=reason, actor=actor)
+    else:
+        status = "verified" if decision == "approve" else "rejected"
+        for f in open_findings:
+            f.verification_status = status
+            session.add(VerificationResult(finding_id=f.id, task_id=task.id, decision=status,
+                                           reasons=[f"human review: {reason}"]))
+        if decision == "approve":
+            move_task(session, task, T.VERIFIED, reason=reason, actor=actor)
+        else:
+            task.last_error = f"rejected in review: {note or 'no reason given'}"[:4000]
+            move_task(session, task, T.FAILED_FINAL, reason=reason, actor=actor)
+    session.add(AuditEvent(tenant_id=tenant_id, actor=actor, action="workflow.review",
+                           resource=f"workflow:{wf.id}",
+                           details={"task": task.plan_key, "task_id": str(task.id), "decision": decision,
+                                    "note": note, "findings": len(open_findings)}))
+    session.commit()
+    return task
 
 
 def cancel(session: Session, workflow_id: uuid.UUID, tenant_id: uuid.UUID, *, actor: str = "user") -> Workflow:

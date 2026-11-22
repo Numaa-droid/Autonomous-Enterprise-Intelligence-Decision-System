@@ -304,6 +304,24 @@ def console_workflow_detail(workflow_id: uuid.UUID, session: SessionDep, setting
     return views.detail(session, views.get_workflow(session, t.id, workflow_id))
 
 
+class ConsoleReview(BaseModel):
+    tenant: str | None = Field(default=None, max_length=200)
+    task_id: uuid.UUID
+    decision: str = Field(pattern="^(approve|reject|rerun)$")
+    note: str = Field(default="", max_length=2000)
+    reviewer: str = Field(default="console", min_length=1, max_length=80)
+
+
+@router.post("/workflows/{workflow_id}/reviews")
+def console_review(workflow_id: uuid.UUID, body: ConsoleReview, request: Request, session: SessionDep,
+                   settings: SettingsDep) -> dict[str, Any]:
+    from aeids.api.routers.workflows import ReviewIn, apply_review
+
+    t = _tenant(session, settings, body.tenant)
+    return apply_review(request, session, t.id, workflow_id,
+                        ReviewIn(task_id=body.task_id, decision=body.decision, note=body.note, reviewer=body.reviewer))
+
+
 # --- traces ---------------------------------------------------------------------
 
 def _trace_rows(session: Session, *, limit: int, offset: int = 0, kind: str | None = None,

@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import re
 import uuid
-from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -170,6 +169,16 @@ class FinancialAnalystAgent:
         if metric.same_line_item and len({facts[f]["label"].casefold() for f in req.inputs.values()}) > 1:
             warnings.append(f"{key}: its inputs must be the same line item; ignored")
             return []
+        for name, fid in req.inputs.items():  # each fact must be the line item the metric names
+            want = metric.inputs[name].line_item
+            if want == knowledge.ANY:
+                continue
+            got = self._kb.line_item_for(facts[fid]["label"])
+            if got is None or got[0] != want:
+                expected = self._kb.line_items[want].name
+                warnings.append(f"{key}: {fid} is \"{facts[fid]['label']}\", not a known name of {expected}; "
+                                f"ignored (add the label to the knowledge base if it is)")
+                return []
         signature = ("metric", key, tuple(sorted(req.inputs.items())))
         if signature in done:
             return []
@@ -194,7 +203,7 @@ class FinancialAnalystAgent:
             o = run.result.output
             shown = calc.display(o) + (f" {metric.result_label}" if run.final and metric.result_label else "")
             if run.final and metric.display == "percentage_points":
-                shown = f"{o.value.quantize(Decimal('0.01')):+,} percentage points"
+                shown = calc.display_points(o)
             if run.final:
                 claim = f"{title}: {shown} [{metric.formula}; {inputs_text}]"
             else:
@@ -213,6 +222,12 @@ class FinancialAnalystAgent:
         fn = req.function.strip()
         if fn not in BASIC:
             warnings.append(f"unknown function {fn!r}; ignored")
+            return None
+        named = self._kb.metric_for(req.title) if req.title else None
+        if named is not None and any(s.line_item != knowledge.ANY for s in named[1].inputs.values()):
+            # a metric with defined line items is computed only with its recipe and line items
+            warnings.append(f"\"{req.title}\" is the knowledge-base metric {named[0]}; a basic {fn} for it is "
+                            "refused (it must be computed with its recipe and line items)")
             return None
         ids = {k: (v if isinstance(v, list) else [v]) for k, v in req.inputs.items()}
         used = [i for v in ids.values() for i in v]

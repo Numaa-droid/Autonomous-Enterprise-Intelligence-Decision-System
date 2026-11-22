@@ -24,7 +24,8 @@ from aeids.agents.financial_analyst import FinancialAnalystAgent
 from aeids.agents.financial_analyst.agent import clean_title
 from aeids.agents.llm_json import extract_json, untrusted
 from aeids.agents.registry import build_registry
-from aeids.agents.stubs import DocumentIntelligenceStub, VerificationStub
+from aeids.agents.stubs import DocumentIntelligenceStub
+from aeids.agents.verification import VerificationAgent
 from aeids.db.models import AgentRun, CalculationRecord, DocumentChunk, EvidenceRecord
 from aeids.llm.openrouter import ChatResult, Usage
 from tests.factories import dumps, grid_table, pdf_bytes, region, structure
@@ -123,17 +124,21 @@ class FakeLLM:
 
     @staticmethod
     def default_calcs(user: str) -> dict:
+        """As the real model answers with prompt v2: knowledge-base metrics, bound to fact ids."""
         facts = facts_in(user)
         by = {(f["label"], f["period"]): f["id"] for f in facts}
-        calcs = []
+        metrics = []
         for fy in ("FY2023", "FY2024", "FY2025"):
             if ("Operating income", fy) in by and ("Total net sales", fy) in by:
-                calcs.append({"function": "margin", "title": f"Apple operating margin, {fy}",
-                              "inputs": {"part": by[("Operating income", fy)], "whole": by[("Total net sales", fy)]}})
+                metrics.append({"metric": "operating_margin", "title": f"Apple operating margin, {fy}",
+                                "inputs": {"operating_income": by[("Operating income", fy)],
+                                           "revenue": by[("Total net sales", fy)]}})
         for cur, prev in (("FY2024", "FY2023"), ("FY2025", "FY2024")):
-            calcs.append({"function": "pct_change", "title": f"Apple revenue growth, {prev} to {cur}",
-                          "inputs": {"current": by[("Total net sales", cur)], "previous": by[("Total net sales", prev)]}})
-        return {"calculations": calcs}
+            if ("Total net sales", cur) in by and ("Total net sales", prev) in by:
+                metrics.append({"metric": "yoy_growth", "title": f"Apple revenue growth, {prev} to {cur}",
+                                "inputs": {"current": by[("Total net sales", cur)],
+                                           "previous": by[("Total net sales", prev)]}})
+        return {"metrics": metrics, "calculations": []}
 
 
 class Env:
@@ -277,7 +282,10 @@ def test_analyst_titles_and_requests_are_checked(env: Env) -> None:
         return {"calculations": [
             {"function": "margin", "inputs": {"part": by[("Operating income", "FY2025")],
                                               "whole": by[("Total net sales", "FY2025")]},
-             "title": "Operating margin of 99.9% in FY2025"},  # a number in the title: replaced
+             "title": "Profit share of sales, 99.9% in FY2025"},  # a number in the title: replaced
+            {"function": "margin", "inputs": {"part": by[("Operating income", "FY2024")],
+                                              "whole": by[("Total net sales", "FY2024")]},
+             "title": "Apple operating margin, FY2024"},  # a defined metric: only through its recipe
             {"function": "margin", "inputs": {"part": op, "whole": rev}, "title": "mixed years"},  # refused
             {"function": "guess", "inputs": {"a": op}, "title": "x"},  # unknown function
             {"function": "ratio", "inputs": {"numerator": "F99", "denominator": op}, "title": "x"},  # unknown fact
@@ -289,6 +297,7 @@ def test_analyst_titles_and_requests_are_checked(env: Env) -> None:
     warnings = wf["tasks_by_key"]["analyse"]["output"]["warnings"]
     assert any("refused by the calculation module" in w for w in warnings)
     assert any("unknown function" in w for w in warnings) and any("F99" in w for w in warnings)
+    assert any("is the knowledge-base metric operating_margin" in w for w in warnings)
 
 
 def test_clean_title() -> None:
@@ -345,7 +354,7 @@ def test_registry_modes(settings) -> None:
     reg = build_registry(auto)
     assert isinstance(reg.get("document_intelligence"), DocumentIntelligenceAgent)
     assert isinstance(reg.get("financial_analyst"), FinancialAnalystAgent)
-    assert isinstance(reg.get("verification"), VerificationStub)
+    assert isinstance(reg.get("verification"), VerificationAgent)
     reg.close()
 
 
@@ -430,6 +439,21 @@ def test_knowledge_base_bindings_are_checked(env: Env) -> None:
     assert any("unknown metric 'magic_ratio'" in w for w in warnings)
     assert any("same line item" in w for w in warnings)
     assert any("unknown function 'intensity'" in w for w in warnings)
-    # net_margin with equity as "net income" is still a currency/currency margin: the knowledge base
-    # cannot know a label is wrong; verification of the cited row is M5's job
-    assert [f["calculation"]["function"] for f in wf["findings"] if f["category"] == "calculation"] == ["margin"]
+    # equity bound as "net income": the row label is not a known name of the line item -> refused
+    assert any("is \"Total shareholders' equity\", not a known name of Net income" in w for w in warnings)
+    assert [f for f in wf["findings"] if f["category"] == "calculation"] == []
+
+
+def test_an_empty_model_reply_is_retried(env: Env) -> None:
+    from aeids.llm.openrouter import LLMResponseError
+
+    real_chat, calls = env.llm.chat, {"n": 0}
+
+    def flaky(*a, **kw):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise LLMResponseError("chat response has no text content")
+        return real_chat(*a, **kw)
+    env.llm.chat = flaky
+    wf = _ask(env, "Compare Apple's revenue and operating margin FY2023–FY2025")
+    assert wf["status"] == "COMPLETED" and wf["tasks_by_key"]["extract"]["attempts"] == 2

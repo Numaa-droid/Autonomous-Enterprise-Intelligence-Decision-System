@@ -30,7 +30,7 @@ from aeids import tracing
 from aeids.agents.base import AgentContext, Registry
 from aeids.config import Settings
 from aeids.contracts import AgentResult, TaskConstraints, TaskMessage
-from aeids.db.models import AgentTask, TaskDependency, TaskStatus, TaskTransition, Workflow, utcnow
+from aeids.db.models import AgentTask, FindingRecord, TaskDependency, TaskStatus, TaskTransition, Workflow, utcnow
 from aeids.llm.embedding import Embedder
 from aeids.llm.openrouter import LLMError
 from aeids.orchestration import supervisor as sup
@@ -86,6 +86,11 @@ def build_message(session: Session, task: AgentTask) -> TaskMessage:
         for key in ("evidence_ids", "sources", "facts", "not_found"):
             if key in out:
                 inputs[key] = [*inputs.get(key, []), *out[key]]
+    if inputs.get("facts"):  # only facts that passed verification go on (M5: rejected ones are dropped)
+        ids = [uuid.UUID(f["finding_id"]) for f in inputs["facts"] if f.get("finding_id")]
+        verified = {str(i) for i in session.scalars(select(FindingRecord.id).where(
+            FindingRecord.id.in_(ids), FindingRecord.verification_status == "verified"))}
+        inputs["facts"] = [f for f in inputs["facts"] if f.get("finding_id") in verified]
     if task.attempts > 1 and task.last_error:  # a retry sees why the last attempt failed (rule 8)
         inputs["previous_error"] = task.last_error[:1000]
     return TaskMessage(

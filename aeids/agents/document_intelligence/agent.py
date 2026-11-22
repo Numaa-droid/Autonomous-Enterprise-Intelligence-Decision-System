@@ -24,7 +24,6 @@ from __future__ import annotations
 import re
 import uuid
 from dataclasses import dataclass
-from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -32,13 +31,11 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from aeids import knowledge
 from aeids.agents.base import AgentContext, ChunkView, CompanyView
+from aeids.agents.cells import FY, column_name, read_cell, row_line
 from aeids.agents.llm_json import ChatModel, Usage, ask_json, load_prompt, untrusted
 from aeids.agents.stubs import _base, _filters, excerpt
-from aeids.calc.functions import SCALE_FACTORS
 from aeids.config import Settings
 from aeids.contracts import AgentResult, EvidenceProposal, EvidenceRef, Finding, TaskMessage
-from aeids.ingestion.chunking import _row_line
-from aeids.ingestion.normalize import NormRow
 from aeids.retrieval.search import SearchFilters, SearchHit
 
 HERE = Path(__file__).parent
@@ -47,8 +44,6 @@ MAX_TABLES = 10
 HITS_PER_QUERY = 6
 PASSAGES = 5
 CELL = re.compile(r"^T(\d+)\.R(\d+)\.C(\d+)$")
-ISO = re.compile(r"^[A-Z]{3}$")
-FY = re.compile(r"^FY\d{4}$")
 
 
 # --- what the model may answer ----------------------------------------------------------------
@@ -97,16 +92,6 @@ class _Table:
         return self.table.get("rows", [])
 
 
-def _column_period(table: dict[str, Any], col: int) -> str | None:
-    periods = table.get("column_periods") or []
-    return periods[col] if col < len(periods) else None
-
-
-def _column_name(table: dict[str, Any], col: int) -> str:
-    names = table.get("columns") or []
-    return _column_period(table, col) or (names[col] if col < len(names) and names[col] else "period not stated")
-
-
 def render_table(t: _Table) -> str:
     """A table as the model sees it: rows R<n>, value cells C<k> with their period."""
     lines = [ln for ln in t.chunk.text.splitlines() if ln.startswith(("Table:", "Units:"))]
@@ -114,7 +99,7 @@ def render_table(t: _Table) -> str:
         lines.append(t.table["subtitle"])
     for n, row in enumerate(t.rows):
         label = f"{row['section']}: {row['label']}" if row.get("section") else row["label"]
-        cells = " | ".join(f"C{c['col']} ({c.get('period') or _column_name(t.table, c['col'])}): {c['text']}"
+        cells = " | ".join(f"C{c['col']} ({c.get('period') or column_name(t.table, c['col'])}): {c['text']}"
                            for c in row.get("cells", []))
         lines.append(f"R{n} | {label}" + (f" | {cells}" if cells else ""))
     return untrusted(t.tid, "\n".join(lines), company=t.hit.company_name, file=t.hit.filename,
@@ -260,38 +245,33 @@ class DocumentIntelligenceAgent:
                 continue
             row = t.rows[r]
             cell = next((c for c in row.get("cells", []) if c.get("col") == col), None)
-            if cell is None or cell.get("value") is None or cell.get("cell_type") not in ("numeric", "percent"):
+            cv = read_cell(cell, t.table) if cell is not None else None
+            if cv is None:
                 warnings.append(f"{pick.metric}: cell {pick.cell} holds no number; ignored")
                 continue
             if (t.tid, r, col) in seen:
                 continue
             seen.add((t.tid, r, col))
-            period = cell.get("period") or _column_period(t.table, col)
-            period = period if period and FY.match(period) else None
+            period, unit, currency, scale = cv.period, cv.unit, cv.currency, cv.scale
             if wanted_periods and period and period not in wanted_periods:
                 warnings.append(f"{pick.metric}: {pick.cell} is for {period}, not asked for; ignored")
                 continue
-            unit, currency, scale = cell.get("unit"), cell.get("currency"), cell.get("scale")
-            if unit == "currency" and not (currency and ISO.match(currency)):
-                warnings.append(f"{pick.metric}: {pick.cell} has no ISO currency; kept as a plain amount")
-                unit, currency = "other", None
-            unit = unit if unit in ("currency", "percent", "count") else "other"
-            scale = scale if scale in SCALE_FACTORS and unit != "percent" else None
+            if cv.note:
+                warnings.append(f"{pick.metric}: {pick.cell} has {cv.note}")
             quote = self._quote(t, row, cell)
             if quote is None:
                 warnings.append(f"{pick.metric}: {pick.cell} could not be quoted from its chunk; ignored")
                 continue
-            page = cell.get("page") or t.chunk.page_start
+            page = cv.page or t.chunk.page_start
             page = page if t.chunk.page_start <= page <= t.chunk.page_end else t.chunk.page_start
-            bbox = cell.get("bbox") if isinstance(cell.get("bbox"), list) and len(cell["bbox"]) == 4 else None
             ev = EvidenceProposal(chunk_id=t.chunk.chunk_id, page=page, section=t.chunk.section,
-                                  quote=quote, bbox=bbox)
+                                  quote=quote, bbox=cv.bbox)
             label = (f"{row['section']}: {row['label']}" if row.get("section") else row["label"])[:200]
             units = _units_text(unit, currency, scale)
             claim = (f"{t.hit.company_name} reports {label} of {cell['text']}"
                      f"{f' ({units})' if units else ''} for {period or 'an unstated period'}"
                      f" ({t.hit.filename}, p. {page}).")
-            value = Decimal(str(cell["value"]))
+            value = cv.value
             finding = Finding(category="reported_value", claim=claim, value=value, unit=unit,
                               currency=currency, scale=scale, period=period,
                               evidence=[EvidenceRef(evidence_id=ev.evidence_id)])
@@ -322,10 +302,7 @@ class DocumentIntelligenceAgent:
     @staticmethod
     def _quote(t: _Table, row: dict[str, Any], cell: dict[str, Any]) -> str | None:
         """The row exactly as it is in the chunk text (rows are written by ``_row_line``)."""
-        try:
-            line = _row_line(NormRow.model_validate(row))
-        except ValueError:
-            line = ""
+        line = row_line(row)
         if line and line in t.chunk.text:
             return line[:2000]
         text = str(cell.get("text") or "")

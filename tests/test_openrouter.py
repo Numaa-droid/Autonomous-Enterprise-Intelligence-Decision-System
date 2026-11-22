@@ -138,6 +138,7 @@ def test_malformed_responses() -> None:
         _client(Fake((200, {"data": [], "model": "m"}))).embed(["x"])
     with pytest.raises(LLMResponseError):
         _client(Fake((200, {"choices": []}))).chat([{"role": "user", "content": "hi"}])
+    assert LLMResponseError("empty").retryable  # an empty reply is retried at task level (bounded)
 
 
 def test_missing_key_fails_before_any_request() -> None:

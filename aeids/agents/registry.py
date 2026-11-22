@@ -3,7 +3,7 @@
 ``agent_mode``: ``llm`` registers the M4 agents (Document Intelligence and Financial Analyst use
 the chat model through ``aeids/llm/openrouter.py``), ``stub`` the M3 stand-ins (no model calls),
 ``auto`` the LLM agents when an OpenRouter key is configured and the stand-ins otherwise.
-Verification is the structural checker in both modes until M5.
+Verification is the deterministic M5 verifier in every mode (no model calls).
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ import logging
 
 from aeids.agents.base import Registry
 from aeids.agents.llm_json import ChatModel
-from aeids.agents.stubs import VerificationStub, default_registry
+from aeids.agents.stubs import default_registry
 from aeids.config import Settings
 
 log = logging.getLogger(__name__)
@@ -31,6 +31,7 @@ def build_registry(settings: Settings, llm: ChatModel | None = None) -> Registry
         return default_registry()
     from aeids.agents.document_intelligence import DocumentIntelligenceAgent
     from aeids.agents.financial_analyst import FinancialAnalystAgent
+    from aeids.agents.verification import VerificationAgent
 
     closers = []
     if llm is None:
@@ -39,4 +40,4 @@ def build_registry(settings: Settings, llm: ChatModel | None = None) -> Registry
         client = OpenRouterClient(settings)
         llm, closers = client, [client.close]
     return Registry([DocumentIntelligenceAgent(llm, settings), FinancialAnalystAgent(llm, settings),
-                     VerificationStub()], closers=closers)
+                     VerificationAgent()], closers=closers)

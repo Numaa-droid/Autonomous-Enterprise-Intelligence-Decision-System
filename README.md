@@ -8,7 +8,7 @@
   <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-source%20of%20truth-8b5cf6?style=flat-square">
   <img alt="Qdrant" src="https://img.shields.io/badge/Qdrant-hybrid%20search-2dd4bf?style=flat-square">
   <img alt="Agents" src="https://img.shields.io/badge/agents-Supervisor%20%C2%B7%20Analyst%20%C2%B7%20Verifier-a78bfa?style=flat-square">
-  <img alt="Status" src="https://img.shields.io/badge/Release%200-M1%E2%80%93M4%20done-22c55e?style=flat-square">
+  <img alt="Status" src="https://img.shields.io/badge/Release%200-M1%E2%80%93M5%20done-22c55e?style=flat-square">
 </p>
 
 <p align="center">
@@ -316,7 +316,8 @@ Every answer depends on finding the right page first, so it is measured. Combini
 > **What works today:** uploading reports, versioning, automatic parsing, hybrid search, the Supervisor and its task plan, crash-safe workers, citation verification, tracing and the web console.
 > **New in M4:** Document Intelligence reads reported values from the parsed tables, and the Financial Analyst calculates margins and growth with the calculation module. For example, *"Compare Apple's revenue and operating margin FY2023–FY2025"* on Apple's 10-K gives 6 reported values (page 32) and 5 calculations (operating margin 29.82% → 31.51% → 31.97%), all verified, for about USD 0.002.
 > **Metric knowledge base:** [`aeids/knowledge/metrics.yaml`](aeids/knowledge/metrics.yaml) defines 41 metrics (margins, growth, ROE, free cash flow, leverage, BRSR intensities, women's representation, LTIFR, CSR spend) as fixed recipes of tested calculation steps, plus how US GAAP, Ind AS and BRSR reports name each line item. The agents pick a metric and the facts; code runs the recipe.
-> **Not yet:** verification checks that every citation exists and quotes its source, but does not yet replay calculations or compare each quoted value (M5). Values printed only in prose or charts are not extracted.
+> **New in M5:** Verification replays every calculation and checks every value against the table cell it came from (value, page, unit, currency, scale, period, current version). Wrong findings go back for at most two rework rounds; what still fails is dropped and listed as a limitation; what cannot be checked automatically waits for a person in the console.
+> **Not yet:** values printed only in prose or charts are not extracted; the single-agent baseline and benchmark are M6.
 
 | Milestone | State |
 |---|---|
@@ -325,8 +326,9 @@ Every answer depends on finding the right page first, so it is measured. Combini
 | Tracing + console: LangSmith-style traces in Postgres, web console at `/ui` (D-022) | ✅ done |
 | M3 Contracts and Supervisor: typed agent messages, task/workflow state machines, Supervisor with retries and rework, crash-safe workers, workflow API and console page (D-024) | ✅ done |
 | M4 LLM Document Intelligence and Financial Analyst, calculation module (D-025) | ✅ done |
-| M5 Verification replays calculations and checks quoted values; fault-injection tests | ⏳ next |
-| M6–M7 Single-agent RAG baseline, full benchmark (AEIDS vs baseline), report output | ⬜ planned |
+| M5 Verification replays calculations and checks quoted values; bounded rework; human review; fault-injection tests (D-027) | ✅ done |
+| M6 Single-agent RAG baseline and benchmark (AEIDS vs baseline) | ⏳ next |
+| M7 Report output and polish | ⬜ planned |
 
 ## Quick start
 
@@ -495,7 +497,7 @@ curl -s http://127.0.0.1:8001/api/v1/workflows -H 'content-type: application/jso
      -d '{"query": "How dependent is NVIDIA on its largest customers?"}'
 ```
 
-The Supervisor plans a task graph (`extract` → `analyse`, plus a `verify` task for every task with findings), the worker runs it, and every state change is saved. `GET /api/v1/workflows/{id}/tasks` shows the graph with attempts and transitions, `/findings` the claims with their evidence quotes, `/{id}` the report (verified findings only). With an OpenRouter key the agents are the M4 LLM agents (`AEIDS_AGENT_MODE=auto`; `stub` runs the M3 stand-ins without model calls): reported values come from table cells, calculations from `aeids/calc/`, and each calculated finding carries its stored calculation in `/findings` and in the report.
+The Supervisor plans a task graph (`extract` → `analyse`, plus a `verify` task for every task with findings), the worker runs it, and every state change is saved. `GET /api/v1/workflows/{id}/tasks` shows the graph with attempts and transitions, `/findings` the claims with their evidence quotes, `/{id}` the report (verified findings only), and `POST /{id}/reviews` lets a person approve, reject or re-run a task waiting for review (also in the console). With an OpenRouter key the agents are the M4 LLM agents (`AEIDS_AGENT_MODE=auto`; `stub` runs the M3 stand-ins without model calls): reported values come from table cells, calculations from `aeids/calc/`, and each calculated finding carries its stored calculation in `/findings` and in the report.
 
 ## Search
 

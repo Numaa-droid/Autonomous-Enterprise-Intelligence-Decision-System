@@ -131,6 +131,18 @@ class KnowledgeBase(_Strict):
         return (best[2], self.line_items[best[2]]) if best else None
 
 
+    def metric_for(self, text: str) -> tuple[str, Metric] | None:
+        """The metric a title or question names (by its name or an alias), if any."""
+        t = _norm(text)
+        best: tuple[int, str] | None = None
+        for key, metric in self.metrics.items():
+            for n in [metric.name, *metric.aliases]:
+                a = _norm(n)
+                if len(a) >= 6 and (a == t or f" {a} " in f" {t} ") and (best is None or len(a) > best[0]):
+                    best = (len(a), key)
+        return (best[1], self.metrics[best[1]]) if best else None
+
+
 def _norm(s: str) -> str:
     return " ".join(re.sub(r"[^a-z0-9%()+]+", " ", s.casefold()).split())
 

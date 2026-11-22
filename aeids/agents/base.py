@@ -11,14 +11,24 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Any, Protocol
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from aeids.config import Settings
 from aeids.contracts import AgentResult, TaskMessage
-from aeids.db.models import Company, Document, DocumentChunk, DocumentVersion, EvidenceRecord
+from aeids.db.models import (
+    CalculationRecord,
+    Company,
+    Document,
+    DocumentChunk,
+    DocumentStatus,
+    DocumentVersion,
+    EvidenceRecord,
+    FindingEvidence,
+    FindingRecord,
+)
 from aeids.llm.embedding import Embedder
 from aeids.retrieval.search import SearchFilters, SearchHit, search
 from aeids.retrieval.vector_index import VectorIndex
@@ -43,6 +53,38 @@ class EvidenceView:
     quote: str
     chunk_text: str | None
     filename: str
+    bbox: Any = None  # stored polygon (PDF points)
+    chunk_meta: dict | None = None
+    chunk_pages: tuple[int, int] | None = None
+    version_is_current: bool = True
+    document_active: bool = True
+
+
+@dataclass(frozen=True)
+class CalculationView:
+    function: str
+    formula: str
+    inputs: dict[str, dict]
+    output: str
+    unit: str
+    currency: str | None
+    scale: str | None
+    calc_version: str
+
+
+@dataclass(frozen=True)
+class FindingView:
+    finding_id: uuid.UUID
+    task_id: uuid.UUID
+    category: str
+    claim: str
+    value: str | None
+    unit: str | None
+    currency: str | None
+    scale: str | None
+    period: str | None
+    evidence_ids: tuple[uuid.UUID, ...]
+    calculation: CalculationView | None
 
 
 class AgentContext:
@@ -66,14 +108,52 @@ class AgentContext:
         if not ids:
             return {}
         rows = self._session.execute(
-            select(EvidenceRecord, DocumentChunk.text, DocumentVersion.filename)
+            select(EvidenceRecord, DocumentChunk, DocumentVersion, Document.status)
             .join(DocumentVersion, DocumentVersion.id == EvidenceRecord.version_id)
+            .join(Document, Document.id == DocumentVersion.document_id)
             .outerjoin(DocumentChunk, DocumentChunk.id == EvidenceRecord.chunk_id)
             .where(EvidenceRecord.id.in_(ids), EvidenceRecord.tenant_id == self.tenant_id)
         ).all()
-        return {ev.id: EvidenceView(ev.id, ev.version_id, ev.chunk_id, ev.page, ev.section,
-                                    ev.quote, text, filename)
-                for ev, text, filename in rows}
+        return {ev.id: EvidenceView(
+            ev.id, ev.version_id, ev.chunk_id, ev.page, ev.section, ev.quote,
+            chunk.text if chunk else None, version.filename, bbox=ev.bbox,
+            chunk_meta=dict(chunk.meta or {}) if chunk else None,
+            chunk_pages=(chunk.page_start, chunk.page_end) if chunk else None,
+            version_is_current=bool(version.is_current), document_active=doc_status == DocumentStatus.ACTIVE.value)
+            for ev, chunk, version, doc_status in rows}
+
+    def findings(self, ids: list[uuid.UUID]) -> dict[uuid.UUID, FindingView]:
+        """Findings of this tenant as stored: values, cited evidence and calculation."""
+        if not ids:
+            return {}
+        return self._finding_views(select(FindingRecord).where(
+            FindingRecord.id.in_(ids), FindingRecord.tenant_id == self.tenant_id))
+
+    def task_findings(self, task_id: uuid.UUID) -> dict[uuid.UUID, FindingView]:
+        """All findings one task produced (e.g. the steps of a multi-step metric)."""
+        return self._finding_views(select(FindingRecord).where(
+            FindingRecord.task_id == task_id, FindingRecord.tenant_id == self.tenant_id))
+
+    def _finding_views(self, stmt) -> dict[uuid.UUID, FindingView]:
+        records = list(self._session.scalars(stmt))
+        if not records:
+            return {}
+        fids = [f.id for f in records]
+        cited: dict[uuid.UUID, list[uuid.UUID]] = {}
+        for fid, eid in self._session.execute(select(FindingEvidence.finding_id, FindingEvidence.evidence_record_id)
+                                              .where(FindingEvidence.finding_id.in_(fids))):
+            cited.setdefault(fid, []).append(eid)
+        calcs = {c.finding_id: c for c in self._session.scalars(
+            select(CalculationRecord).where(CalculationRecord.finding_id.in_(fids)))}
+        out = {}
+        for f in records:
+            c = calcs.get(f.id)
+            out[f.id] = FindingView(
+                f.id, f.task_id, f.category, f.claim, f.value, f.unit, f.currency, f.scale, f.period,
+                tuple(cited.get(f.id, [])),
+                None if c is None else CalculationView(c.function, c.formula, dict(c.inputs), c.output, c.unit,
+                                                       c.currency, c.scale, c.calc_version))
+        return out
 
     def companies(self) -> list[CompanyView]:
         """Companies of this tenant with at least one current (searchable) report version."""

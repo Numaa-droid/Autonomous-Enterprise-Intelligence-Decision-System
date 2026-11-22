@@ -753,7 +753,7 @@ async function viewWorkflows(root) {
     el("h2", {}, "Ask AEIDS"),
     el("p", {}, "The Supervisor turns your question into a task graph. Document Intelligence collects evidence, the Financial Analyst forms findings, and Verification checks every claim against its source before it can reach the report."),
     el("div", { style: { marginTop: "16px" } }, form), note,
-    el("div", { class: "small muted", style: { marginTop: "10px" } }, "Release 0 / M3: the agents are stand-ins (real search and verification, no LLM extraction yet; that is M4).")),
+    el("div", { class: "small muted", style: { marginTop: "10px" } }, "Document Intelligence reads values from the parsed tables, the Financial Analyst computes with tested code (metric knowledge base), and Verification replays every calculation and checks every value against its table cell. Anything it cannot check waits here for a person.")),
     card("Recent workflows", state.tenant ? `tenant ${state.tenant}` : null, list)]);
   await load();
   input.focus();
@@ -763,11 +763,12 @@ async function viewWorkflows(root) {
 async function viewWorkflow(root, id) {
   const graphBox = el("div", { class: "dag" });
   const parts = { head: el("div"), graph: card("Task graph", "arrows: depends on · dashed: verifies", graphBox),
-    findings: el("div"), timeline: el("div"), report: el("div") };
-  append(root, [parts.head, parts.graph, el("div", { class: "grid g-2", style: { alignItems: "start" } }, parts.findings, parts.timeline), parts.report]);
+    findings: el("div"), timeline: el("div"), report: el("div"), review: el("div") };
+  append(root, [parts.head, parts.review, parts.graph, el("div", { class: "grid g-2", style: { alignItems: "start" } }, parts.findings, parts.timeline), parts.report]);
   const load = async () => {
     const wf = await api(`/workflows/${encodeURIComponent(id)}?${tq()}`);
     drawHead(parts.head, wf);
+    drawReview(parts.review, wf, load);
     drawGraph(graphBox, wf.tasks);
     drawFindings(parts.findings, wf.findings);
     drawTimeline(parts.timeline, wf);
@@ -794,6 +795,33 @@ function drawHead(box, wf) {
       el("div", {}, el("b", {}, fmtInt(wf.tasks.reduce((a, t) => a + Math.max(0, t.attempts - 1), 0))), "retries"),
       el("div", {}, el("b", {}, fmtInt(wf.verified_findings)), "verified findings"),
       el("div", {}, el("b", {}, fmtDate(wf.created_at)), "started"))));
+}
+
+function drawReview(box, wf, reload) {
+  const waiting = wf.tasks.filter((t) => t.status === "NEEDS_HUMAN_REVIEW");
+  if (!waiting.length) { box.replaceChildren(); return; }
+  box.replaceChildren(card("Waiting for review", "a person decides; every decision is recorded with your note",
+    waiting.map((t) => {
+      const note = el("input", { type: "text", placeholder: "Note (what you checked, or why you reject)", "aria-label": "Review note" });
+      const open = wf.findings.filter((f) => f.task_id === t.id && ["needs_review", "pending"].includes(f.verification_status));
+      const send = async (decision) => {
+        try {
+          await api(`/workflows/${encodeURIComponent(wf.id)}/reviews`, { method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ tenant: state.tenant || null, task_id: t.id, decision, note: note.value }) });
+          await reload();
+        } catch (e) { toast(e.message); }
+      };
+      return el("div", { class: "version" },
+        el("div", { class: "version-top" }, el("b", {}, `${t.plan_key} · ${AGENT_LABEL[t.agent] || t.agent}`), stateTag(TASK_STATE, t.status)),
+        el("div", { class: "small muted", style: { margin: "6px 0" } }, t.last_error || `${open.length} finding(s) could not be checked automatically.`),
+        open.length ? el("ul", { class: "small" }, open.map((f) => el("li", {}, f.claim, el("div", { class: "muted" },
+          (f.verifications.at(-1)?.reasons || []).join("; "))))) : null,
+        note,
+        el("div", { style: { display: "flex", gap: "8px", marginTop: "8px", flexWrap: "wrap" } },
+          el("button", { class: "btn primary", onclick: () => send("approve") }, icon("check"), "Approve"),
+          open.length ? null : el("button", { class: "btn", onclick: () => send("rerun") }, "Re-run"),
+          el("button", { class: "btn", onclick: () => send("reject") }, icon("x"), "Reject")));
+    })));
 }
 
 function drawGraph(box, tasks) {
@@ -858,6 +886,7 @@ function drawFindings(box, findings) {
         el("span", { class: "badge" }, f.category)),
       el("div", { style: { margin: "8px 0", fontWeight: 600 } }, f.claim),
       f.value ? el("div", { class: "small" }, `Value: ${f.value} ${f.unit || ""} ${f.currency || ""} ${f.scale || ""} ${f.period || ""}`) : null,
+      f.calculation ? el("div", { class: "small muted" }, `Calculation: ${f.calculation.function} · ${f.calculation.formula} · calc ${f.calculation.calc_version}`) : null,
       el("details", { class: "warn", open: true }, el("summary", {}, `${f.evidence.length} evidence passage(s)`),
         f.evidence.map((e) => el("div", { class: "evidence" },
           el("div", { class: "small" }, el("b", {}, e.file), ` · p. ${e.page}`, e.section ? ` · ${e.section}` : ""),

@@ -1,15 +1,15 @@
-"""Workflows: ask a question, watch the task graph, read verified findings (M3)."""
+"""Workflows: ask a question, watch the task graph, read verified findings, review (M3, M5)."""
 
 from __future__ import annotations
 
 import uuid
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Request, status
 from pydantic import BaseModel, Field
 
 from aeids.api.deps import SessionDep, TenantDep
-from aeids.api.processing import registry, schedule_workflow
+from aeids.api.processing import registry, resume_workflow, schedule_workflow
 from aeids.api.schemas import ErrorOut
 from aeids.orchestration import supervisor as sup
 from aeids.orchestration import views
@@ -63,6 +63,32 @@ def tasks(workflow_id: uuid.UUID, session: SessionDep, tenant_id: TenantDep) -> 
 @router.get("/{workflow_id}/findings", responses={404: {"model": ErrorOut}})
 def findings(workflow_id: uuid.UUID, session: SessionDep, tenant_id: TenantDep) -> list[dict[str, Any]]:
     return views.findings(session, views.get_workflow(session, tenant_id, workflow_id))
+
+
+class ReviewIn(BaseModel):
+    task_id: uuid.UUID
+    decision: Literal["approve", "reject", "rerun"]
+    note: str = Field(default="", max_length=2000)
+    reviewer: str = Field(default="reviewer", min_length=1, max_length=80)
+
+
+def apply_review(request: Request, session, tenant_id: uuid.UUID, workflow_id: uuid.UUID,
+                 body: ReviewIn) -> dict[str, Any]:
+    task = sup.review(session, workflow_id, tenant_id, body.task_id, decision=body.decision, note=body.note,
+                      reviewer=body.reviewer)
+    processing = resume_workflow(request.app.state, workflow_id,
+                                 task.id if body.decision == "rerun" else None)
+    session.expire_all()
+    return {**views.summary(session, views.get_workflow(session, tenant_id, workflow_id)), "processing": processing}
+
+
+@router.post("/{workflow_id}/reviews", responses={404: {"model": ErrorOut}, 409: {"model": ErrorOut}})
+def review(workflow_id: uuid.UUID, body: ReviewIn, request: Request, session: SessionDep,
+           tenant_id: TenantDep) -> dict[str, Any]:
+    """Decide on a task waiting for human review: approve (its open findings become verified),
+    reject (they are rejected, the task fails) or rerun (a task without findings runs again,
+    e.g. after the missing report was uploaded)."""
+    return apply_review(request, session, tenant_id, workflow_id, body)
 
 
 @router.post("/{workflow_id}/cancel", responses={404: {"model": ErrorOut}, 409: {"model": ErrorOut}})

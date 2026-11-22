@@ -366,3 +366,8 @@ def display(q: Quantity) -> str:
     if q.scale and q.scale != "units":
         text += f" {q.scale}"
     return text
+
+
+def display_points(q: Quantity) -> str:
+    """A change between two percentages, in percentage points (e.g. "-3.90 percentage points")."""
+    return f"{q.value.quantize(Decimal('0.01')):+,} percentage points"

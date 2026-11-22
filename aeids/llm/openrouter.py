@@ -58,7 +58,10 @@ class LLMTransientError(LLMError):
 
 
 class LLMResponseError(LLMError):
-    """A 200 response without the expected content."""
+    """A 200 response without the expected content (e.g. an empty reply). Transient: providers
+    occasionally return one; the task is retried with backoff, bounded by its max attempts."""
+
+    retryable = True
 
 
 @dataclass(frozen=True)

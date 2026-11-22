@@ -82,6 +82,20 @@ def registry(state: Any):
     return state.registry
 
 
+def resume_workflow(state: Any, workflow_id: uuid.UUID, queued_task: uuid.UUID | None = None) -> str:
+    """Continue a workflow after a human review; ``queued_task`` is a task the review re-queued
+    (a tick only enqueues tasks it moves itself)."""
+    from aeids.orchestration.jobs import enqueue_task
+
+    if state.settings.jobs_mode == "queue" and queued_task is not None:
+        try:
+            enqueue_task(state.settings, queued_task, queue=getattr(state, "queue", None))
+        except JobQueueUnavailable as exc:
+            log.warning("task %s not queued: %s", queued_task, exc)
+            return "not_queued"
+    return schedule_workflow(state, workflow_id)
+
+
 def schedule_workflow(state: Any, workflow_id: uuid.UUID) -> str:
     """Start a planned workflow per ``jobs_mode``: queued (worker runs it), done (inline), off,
     or not_queued (queue down; a worker resumes it when it starts)."""

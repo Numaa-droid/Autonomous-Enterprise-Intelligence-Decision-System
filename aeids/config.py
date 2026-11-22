@@ -63,7 +63,7 @@ class Settings(BaseSettings):
     task_max_attempts: int = Field(default=3, ge=1, le=10)
     task_timeout_seconds: int = Field(default=180, ge=5, le=3600)  # also the worker's lease
     task_retry_backoff_seconds: float = Field(default=5.0, ge=0, le=600)  # doubled per attempt
-    workflow_max_rework_rounds: int = Field(default=1, ge=0, le=5)
+    workflow_max_rework_rounds: int = Field(default=2, ge=0, le=5)  # MVP_PLAN M5: at most 2
     stub_agent_delay_seconds: float = Field(default=0.0, ge=0, le=120)  # demo / crash tests
     # M4: "llm" runs the LLM agents, "stub" the M3 stand-ins, "auto" the LLM agents when an
     # OpenRouter key is set (D-025)
