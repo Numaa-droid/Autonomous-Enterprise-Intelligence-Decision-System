@@ -393,7 +393,7 @@ Then open **http://127.0.0.1:8001/ui**: upload a report on **Documents**, ask a 
 | [`tablelens/`](tablelens/README.md) | PDF parsing pipeline, run as its own service |
 | [`eval/`](eval/) | Benchmark questions, corpus list and runners |
 | [`docs/`](docs/) | [Architecture](docs/ARCHITECTURE.md), [MVP plan](docs/MVP_PLAN.md), [decision log](docs/DECISIONS.md) |
-| [`assets/`](assets/) | README graphics |
+| [`assets/`](assets/) | README graphics, and `make_svgs.py`, which draws them (`python assets/make_svgs.py assets`) |
 
 </details>
 
