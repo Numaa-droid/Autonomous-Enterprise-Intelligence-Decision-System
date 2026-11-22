@@ -1,0 +1,858 @@
+# AEIDS metric knowledge base (D-026).
+#
+# What a financial or BRSR metric means, which reported line items it needs and how it is
+# computed. Agents read it (to know what to look for and which metric answers a question);
+# they never compute from it: every recipe step calls a tested function in aeids/calc, and the
+# loader (aeids/knowledge/metrics.py) refuses this file if a recipe names an unknown function,
+# input, step or line item.
+#
+# line_items: what a report prints, under its US GAAP / Ind AS / BRSR names.
+#   unit:  currency | count | other (physical: GJ, kL, tCO2e, tonnes, hours) | percent
+#   sign:  outflow = usually printed negative (cash flow statement); recipes take |value|
+#   reported_ratio_of: a ratio BRSR prints itself; the metric that recomputes it
+# metrics: a recipe of steps. Each step calls one aeids/calc function; its args name metric
+#   inputs or earlier steps ("values" takes a list); "constants" are stored as typed inputs.
+#   The last step is the metric. periods: rules checked before running
+#   (same: all for one fiscal year; later/earlier: two fiscal years in order).
+# Bump "version" whenever a definition changes; it is recorded with every agent run.
+
+version: "1.0"
+
+line_items:
+  # ---------------- income statement ----------------
+  revenue:
+    name: Total revenue
+    aliases: [Total net sales, Net sales, Total revenues, Revenues, Revenue, Revenue from operations,
+              Revenue from contracts with customers, Turnover, Income from operations]
+    statement: income_statement
+    unit: currency
+    notes: >-
+      The consolidated total. Ind AS "Revenue from operations" excludes other income; never use
+      "Total income" (it adds other income).
+  other_income:
+    name: Other income
+    aliases: ["Other income/(expense), net", "Other income, net", Other non-operating income]
+    statement: income_statement
+    unit: currency
+    notes: May be negative.
+  cost_of_revenue:
+    name: Cost of revenue
+    aliases: [Total cost of sales, Cost of sales, Total cost of revenue, Cost of revenues, Cost of goods sold]
+    statement: income_statement
+    unit: currency
+    notes: >-
+      Ind AS statements print cost of materials consumed, purchases of stock-in-trade and changes
+      in inventories separately; their sum is the cost of goods sold.
+  gross_profit:
+    name: Gross profit
+    aliases: [Gross margin, Total gross margin, Gross profit]
+    statement: income_statement
+    unit: currency
+    notes: US filers often label gross profit "Gross margin" (an amount, not a percentage).
+  rnd_expense:
+    name: Research and development expense
+    aliases: [Research and development, Research and development expenses, Technology and development]
+    statement: income_statement
+    unit: currency
+  employee_benefits_expense:
+    name: Employee benefits expense
+    aliases: [Employee benefit expenses, Employee benefits expense, Employee costs, Staff costs, Salaries and wages]
+    statement: income_statement
+    unit: currency
+  depreciation_amortisation:
+    name: Depreciation and amortisation
+    aliases: [Depreciation and amortization, Depreciation and amortisation expense,
+              "Depreciation, amortization and impairment", Depreciation and amortisation]
+    statement: income_statement
+    unit: currency
+    notes: Also in the cash flow statement as an adjustment; use one source consistently.
+  operating_income:
+    name: Operating income
+    aliases: [Operating income, Income from operations, Operating profit, Profit from operations,
+              Total operating income, Earnings before interest and taxes, EBIT]
+    statement: income_statement
+    unit: currency
+    notes: >-
+      Ind AS statements usually print no operating profit line; use the metric
+      operating_margin_ind_as, which derives EBIT from profit before tax.
+  finance_costs:
+    name: Finance costs
+    aliases: [Finance costs, Interest expense, Interest and finance charges, "Interest expense, net"]
+    statement: income_statement
+    unit: currency
+    sign: outflow
+  profit_before_tax:
+    name: Profit before tax
+    aliases: [Income before provision for income taxes, Income before income taxes, Profit before tax,
+              Profit before income tax, Earnings before income taxes]
+    statement: income_statement
+    unit: currency
+    notes: Ind AS may print it before and after exceptional items; use the line after them.
+  tax_expense:
+    name: Income tax expense
+    aliases: [Provision for income taxes, Total tax expense, Income tax expense, Tax expense]
+    statement: income_statement
+    unit: currency
+  net_income:
+    name: Net income
+    aliases: [Net income, Profit for the year, Profit after tax, Net profit, Profit for the period,
+              Net income attributable to shareholders, Profit attributable to owners of the Company]
+    statement: income_statement
+    unit: currency
+    notes: For returns on equity prefer the profit attributable to the owners of the parent.
+
+  # ---------------- balance sheet ----------------
+  total_assets:
+    name: Total assets
+    aliases: [Total assets, Total Assets]
+    statement: balance_sheet
+    unit: currency
+  current_assets:
+    name: Total current assets
+    aliases: [Total current assets]
+    statement: balance_sheet
+    unit: currency
+  inventories:
+    name: Inventories
+    aliases: [Inventories, Inventory]
+    statement: balance_sheet
+    unit: currency
+  trade_receivables:
+    name: Trade receivables
+    aliases: ["Accounts receivable, net", Trade receivables, Accounts receivable, "Trade receivables, net"]
+    statement: balance_sheet
+    unit: currency
+  cash_and_equivalents:
+    name: Cash and cash equivalents
+    aliases: [Cash and cash equivalents, Cash and bank balances]
+    statement: balance_sheet
+    unit: currency
+  current_liabilities:
+    name: Total current liabilities
+    aliases: [Total current liabilities]
+    statement: balance_sheet
+    unit: currency
+  total_equity:
+    name: Total equity
+    aliases: [Total shareholders' equity, Total stockholders' equity, Total equity,
+              Equity attributable to owners of the Company, Total equity attributable to equity holders]
+    statement: balance_sheet
+    unit: currency
+  borrowings_current:
+    name: Current borrowings
+    aliases: [Short-term borrowings, Current borrowings, Borrowings (current), Commercial paper,
+              Term debt (current), Current portion of long-term debt]
+    statement: balance_sheet
+    unit: currency
+    notes: When a report prints several current debt lines (e.g. commercial paper and current term debt), each is one input.
+  borrowings_non_current:
+    name: Non-current borrowings
+    aliases: [Long-term debt, Term debt, Non-current borrowings, Borrowings (non-current), Long-term borrowings]
+    statement: balance_sheet
+    unit: currency
+
+  # ---------------- cash flow statement ----------------
+  operating_cash_flow:
+    name: Cash from operating activities
+    aliases: [Cash generated by operating activities, Net cash provided by operating activities,
+              Net cash from operating activities, Net cash generated from operating activities,
+              Net cash flow from operating activities]
+    statement: cash_flow
+    unit: currency
+  capital_expenditure:
+    name: Capital expenditure
+    aliases: ["Payments for acquisition of property, plant and equipment", Purchases of property and equipment,
+              "Purchase of property, plant and equipment", Capital expenditure,
+              "Acquisition of property, plant and equipment"]
+    statement: cash_flow
+    unit: currency
+    sign: outflow
+  dividends_paid:
+    name: Dividends paid
+    aliases: [Payments for dividends and dividend equivalents, Dividends paid, Common stock cash dividends paid,
+              Dividends paid to shareholders]
+    statement: cash_flow
+    unit: currency
+    sign: outflow
+
+  # ---------------- BRSR, Principle 6 (environment) ----------------
+  energy_total:
+    name: Total energy consumed
+    aliases: [Total energy consumed (A+B+C+D+E+F), Total energy consumption, Total energy consumed]
+    statement: brsr_environment
+    unit: other
+    notes: BRSR asks for joules or multiples, usually GJ.
+  energy_renewable:
+    name: Total energy consumed from renewable sources
+    aliases: [Total energy consumed from renewable sources (A+B+C), Total energy consumption from renewable sources]
+    statement: brsr_environment
+    unit: other
+  water_withdrawal:
+    name: Total water withdrawal
+    aliases: [Total volume of water withdrawal (in kilolitres) (i + ii + iii + iv + v), Total volume of water withdrawal]
+    statement: brsr_environment
+    unit: other
+    notes: Kilolitres.
+  water_consumption:
+    name: Total water consumption
+    aliases: [Total volume of water consumption (in kilolitres), Total volume of water consumption]
+    statement: brsr_environment
+    unit: other
+    notes: Kilolitres.
+  scope1_emissions:
+    name: Total Scope 1 emissions
+    aliases: [Total Scope 1 emissions, Scope 1 emissions]
+    statement: brsr_environment
+    unit: other
+    notes: Metric tonnes of CO2 equivalent.
+  scope2_emissions:
+    name: Total Scope 2 emissions
+    aliases: [Total Scope 2 emissions, Scope 2 emissions]
+    statement: brsr_environment
+    unit: other
+    notes: Metric tonnes of CO2 equivalent.
+  waste_generated:
+    name: Total waste generated
+    aliases: [Total (A+B+C+D+E+F+G+H), Total waste generated]
+    statement: brsr_environment
+    unit: other
+    notes: Metric tonnes; the total row of the waste-generated table.
+  waste_recovered:
+    name: Total waste recovered
+    aliases: ["Total waste recovered through recycling, re-using or other recovery operations"]
+    statement: brsr_environment
+    unit: other
+    notes: Metric tonnes; the total of the recovered-waste table.
+
+  # ---------------- BRSR, Section A and Principle 3 (people) ----------------
+  employees_total:
+    name: Total employees
+    aliases: [Total employees (D + E), Total employees, Total Employees, Total permanent employees]
+    statement: brsr_social
+    unit: count
+    notes: Column "Total (A)" of the employees table.
+  employees_female:
+    name: Female employees
+    aliases: [Female employees, Total employees (D + E) Female No. (C)]
+    statement: brsr_social
+    unit: count
+    notes: Column "Female No. (C)" of the "Total employees" row; BRSR also prints the share (% (C / A)).
+  board_total:
+    name: Board of Directors, total
+    aliases: [Board of Directors, Board of Directors Total (A)]
+    statement: brsr_social
+    unit: count
+  board_female:
+    name: Board of Directors, women
+    aliases: [Board of Directors No. (B), Women directors, Female directors]
+    statement: brsr_social
+    unit: count
+    notes: Column "No. (B)" of the "Board of Directors" row in "Participation/Inclusion/Representation of women".
+  wellbeing_cost:
+    name: Cost incurred on well-being measures
+    aliases: [Cost incurred on well-being measures, Cost incurred on well- being measures]
+    statement: brsr_social
+    unit: currency
+  lost_time_injuries:
+    name: Lost time injuries
+    aliases: [Number of lost time injuries, Lost time injuries, Total recordable work-related injuries]
+    statement: brsr_social
+    unit: count
+    notes: Use the lost-time injuries count; "recordable injuries" is a wider measure.
+  person_hours_worked:
+    name: Person-hours worked
+    aliases: [Total person hours worked, Man-hours worked, Person-hours worked]
+    statement: brsr_social
+    unit: count
+
+  # ---------------- CSR (Section 135, Companies Act 2013) ----------------
+  csr_amount_spent:
+    name: CSR amount spent in the financial year
+    aliases: [Total amount spent for the Financial Year, Amount spent in the Financial Year,
+              Total CSR amount spent, CSR expenditure]
+    statement: csr
+    unit: currency
+  csr_average_net_profit:
+    name: Average net profit as per section 135(5)
+    aliases: [Average net profit of the company as per section 135(5), Average net profit of the company as per sub-section (5) of section 135]
+    statement: csr
+    unit: currency
+  csr_obligation:
+    name: Total CSR obligation for the financial year
+    aliases: [Total CSR obligation for the financial year, Two percent of average net profit of the company as per section 135(5)]
+    statement: csr
+    unit: currency
+
+  # ---------------- ratios BRSR prints itself (read directly; the metric recomputes them) ----------------
+  energy_intensity_reported:
+    name: Energy intensity per rupee of turnover (as printed)
+    aliases: [Energy intensity per rupee of turnover (Total energy consumed / Revenue from operations), Energy intensity per rupee of turnover]
+    statement: brsr_environment
+    unit: other
+    reported_ratio_of: energy_intensity_turnover
+  water_intensity_reported:
+    name: Water intensity per rupee of turnover (as printed)
+    aliases: [Water intensity per rupee of turnover (Total water consumption / Revenue from operations), Water intensity per rupee of turnover]
+    statement: brsr_environment
+    unit: other
+    reported_ratio_of: water_intensity_turnover
+  emission_intensity_reported:
+    name: Scope 1 and 2 emission intensity per rupee of turnover (as printed)
+    aliases: [Total Scope 1 and Scope 2 emission intensity per rupee of turnover (Total Scope 1 and Scope 2 GHG emissions / Revenue from operations),
+              Total Scope 1 and Scope 2 emission intensity per rupee of turnover]
+    statement: brsr_environment
+    unit: other
+    reported_ratio_of: emission_intensity_turnover
+  waste_intensity_reported:
+    name: Waste intensity per rupee of turnover (as printed)
+    aliases: [Waste intensity per rupee of turnover (Total waste generated / Revenue from operations), Waste intensity per rupee of turnover]
+    statement: brsr_environment
+    unit: other
+    reported_ratio_of: waste_intensity_turnover
+  ltifr_reported:
+    name: LTIFR (as printed)
+    aliases: [Lost Time Injury Frequency Rate (LTIFR) (per one million-person hours worked), LTIFR]
+    statement: brsr_social
+    unit: other
+    reported_ratio_of: ltifr
+  wellbeing_cost_share_reported:
+    name: Well-being cost as % of total revenue (as printed)
+    aliases: [Cost incurred on well-being measures as a % of total revenue of the company]
+    statement: brsr_social
+    unit: percent
+    reported_ratio_of: wellbeing_cost_share
+  employee_turnover_rate_reported:
+    name: Turnover rate for permanent employees (as printed)
+    aliases: [Turnover rate for permanent employees and workers, Permanent Employees turnover rate]
+    statement: brsr_social
+    unit: percent
+    notes: BRSR prints the rate only; there is no recomputing metric.
+  msme_sourcing_share_reported:
+    name: Input material sourced from MSMEs / small producers (as printed)
+    aliases: [Directly sourced from MSMEs/ small producers, Directly sourced from MSMEs/small producers]
+    statement: brsr_social
+    unit: percent
+  smaller_towns_wages_share_reported:
+    name: Wages paid in smaller towns as % of total wage cost (as printed)
+    aliases: [Rural, Semi-urban, Job creation in smaller towns]
+    statement: brsr_social
+    unit: percent
+    notes: BRSR Principle 8 prints one percentage per location type (rural, semi-urban, urban, metropolitan).
+
+metrics:
+  # ---------------- profitability ----------------
+  gross_margin:
+    name: Gross margin
+    aliases: [gross profit margin]
+    category: profitability
+    unit: percent
+    formula: Gross profit / revenue × 100
+    inputs: {gross_profit: {line_item: gross_profit}, revenue: {line_item: revenue}}
+    periods: [{same: [gross_profit, revenue]}]
+    recipe:
+      - {function: margin, args: {part: gross_profit, whole: revenue}}
+  operating_margin:
+    name: Operating margin
+    aliases: [EBIT margin, operating profit margin]
+    category: profitability
+    unit: percent
+    formula: Operating income / revenue × 100
+    inputs: {operating_income: {line_item: operating_income}, revenue: {line_item: revenue}}
+    periods: [{same: [operating_income, revenue]}]
+    recipe:
+      - {function: margin, args: {part: operating_income, whole: revenue}}
+  operating_margin_ind_as:
+    name: Operating margin (Ind AS, EBIT derived)
+    aliases: [EBIT margin from profit before tax]
+    category: profitability
+    unit: percent
+    formula: (Profit before tax + |finance costs| − other income) / revenue × 100
+    inputs:
+      profit_before_tax: {line_item: profit_before_tax}
+      finance_costs: {line_item: finance_costs}
+      other_income: {line_item: other_income}
+      revenue: {line_item: revenue}
+    periods: [{same: [profit_before_tax, finance_costs, other_income, revenue]}]
+    recipe:
+      - {id: interest, function: absolute, args: {a: finance_costs}}
+      - {id: pbit, function: sum_values, args: {values: [profit_before_tax, interest]}}
+      - {id: ebit, function: difference, args: {a: pbit, b: other_income}}
+      - {function: margin, args: {part: ebit, whole: revenue}}
+    notes: For statements without an operating profit line (most Ind AS reports).
+  net_margin:
+    name: Net profit margin
+    aliases: [net margin, PAT margin, profit margin]
+    category: profitability
+    unit: percent
+    formula: Net income / revenue × 100
+    inputs: {net_income: {line_item: net_income}, revenue: {line_item: revenue}}
+    periods: [{same: [net_income, revenue]}]
+    recipe:
+      - {function: margin, args: {part: net_income, whole: revenue}}
+  ebitda:
+    name: EBITDA
+    aliases: ["earnings before interest, tax, depreciation and amortisation"]
+    category: profitability
+    unit: currency
+    formula: Operating income + depreciation and amortisation
+    inputs: {operating_income: {line_item: operating_income}, depreciation: {line_item: depreciation_amortisation}}
+    periods: [{same: [operating_income, depreciation]}]
+    recipe:
+      - {function: sum_values, args: {values: [operating_income, depreciation]}}
+    notes: A non-GAAP measure; companies define it differently. This is the simple definition.
+  ebitda_margin:
+    name: EBITDA margin
+    aliases: []
+    category: profitability
+    unit: percent
+    formula: (Operating income + depreciation and amortisation) / revenue × 100
+    inputs:
+      operating_income: {line_item: operating_income}
+      depreciation: {line_item: depreciation_amortisation}
+      revenue: {line_item: revenue}
+    periods: [{same: [operating_income, depreciation, revenue]}]
+    recipe:
+      - {id: ebitda, function: sum_values, args: {values: [operating_income, depreciation]}}
+      - {function: margin, args: {part: ebitda, whole: revenue}}
+  effective_tax_rate:
+    name: Effective tax rate
+    aliases: [ETR]
+    category: profitability
+    unit: percent
+    formula: Income tax expense / profit before tax × 100
+    inputs: {tax_expense: {line_item: tax_expense}, profit_before_tax: {line_item: profit_before_tax}}
+    periods: [{same: [tax_expense, profit_before_tax]}]
+    recipe:
+      - {function: margin, args: {part: tax_expense, whole: profit_before_tax}}
+  rnd_intensity:
+    name: R&D intensity
+    aliases: [R&D as % of revenue, research and development intensity]
+    category: profitability
+    unit: percent
+    formula: Research and development expense / revenue × 100
+    inputs: {rnd: {line_item: rnd_expense}, revenue: {line_item: revenue}}
+    periods: [{same: [rnd, revenue]}]
+    recipe:
+      - {function: margin, args: {part: rnd, whole: revenue}}
+  employee_cost_ratio:
+    name: Employee cost ratio
+    aliases: [employee cost as % of revenue, staff cost ratio]
+    category: profitability
+    unit: percent
+    formula: Employee benefits expense / revenue × 100
+    inputs: {employee_cost: {line_item: employee_benefits_expense}, revenue: {line_item: revenue}}
+    periods: [{same: [employee_cost, revenue]}]
+    recipe:
+      - {function: margin, args: {part: employee_cost, whole: revenue}}
+
+  # ---------------- growth (any reported amount) ----------------
+  yoy_growth:
+    name: Year-on-year growth
+    aliases: [growth, increase, change, YoY]
+    category: growth
+    unit: percent
+    formula: (Current − previous) / |previous| × 100
+    inputs: {current: {line_item: any}, previous: {line_item: any}}
+    periods: [{later: current, earlier: previous}]
+    same_line_item: true
+    recipe:
+      - {function: pct_change, args: {current: current, previous: previous}}
+  point_change:
+    name: Change in percentage points
+    aliases: [percentage-point change, margin change, change in a ratio printed as a percentage]
+    category: growth
+    unit: percent
+    display: percentage_points
+    formula: Current percentage − previous percentage (percentage points)
+    inputs: {current: {line_item: any, unit: percent}, previous: {line_item: any, unit: percent}}
+    periods: [{later: current, earlier: previous}]
+    same_line_item: true
+    recipe:
+      - {function: difference, args: {a: current, b: previous}}
+    notes: For a margin or share printed as a percentage; growth of a percentage (pct_change) is ambiguous and refused.
+  cagr:
+    name: Compound annual growth rate
+    aliases: [CAGR, compound growth]
+    category: growth
+    unit: percent
+    formula: ((End / start) ^ (1 / years) − 1) × 100
+    inputs: {end: {line_item: any}, start: {line_item: any}}
+    periods: [{later: end, earlier: start}]
+    same_line_item: true
+    recipe:
+      - {function: cagr, args: {end: end, start: start}}
+
+  # ---------------- returns ----------------
+  roe:
+    name: Return on equity
+    aliases: [ROE, return on average equity]
+    category: returns
+    unit: percent
+    formula: Net income / average of opening and closing total equity × 100
+    inputs:
+      net_income: {line_item: net_income}
+      equity_end: {line_item: total_equity}
+      equity_start: {line_item: total_equity}
+    periods: [{same: [net_income, equity_end]}, {later: equity_end, earlier: equity_start}]
+    recipe:
+      - {id: avg_equity, function: average, args: {values: [equity_end, equity_start]}}
+      - {function: margin, args: {part: net_income, whole: avg_equity}}
+  roa:
+    name: Return on assets
+    aliases: [ROA]
+    category: returns
+    unit: percent
+    formula: Net income / average of opening and closing total assets × 100
+    inputs:
+      net_income: {line_item: net_income}
+      assets_end: {line_item: total_assets}
+      assets_start: {line_item: total_assets}
+    periods: [{same: [net_income, assets_end]}, {later: assets_end, earlier: assets_start}]
+    recipe:
+      - {id: avg_assets, function: average, args: {values: [assets_end, assets_start]}}
+      - {function: margin, args: {part: net_income, whole: avg_assets}}
+  roce:
+    name: Return on capital employed
+    aliases: [ROCE]
+    category: returns
+    unit: percent
+    formula: Operating income / (total assets − current liabilities) × 100, year end
+    inputs:
+      operating_income: {line_item: operating_income}
+      total_assets: {line_item: total_assets}
+      current_liabilities: {line_item: current_liabilities}
+    periods: [{same: [operating_income, total_assets, current_liabilities]}]
+    recipe:
+      - {id: capital_employed, function: difference, args: {a: total_assets, b: current_liabilities}}
+      - {function: margin, args: {part: operating_income, whole: capital_employed}}
+    notes: Uses year-end capital employed; some companies use the average.
+  asset_turnover:
+    name: Asset turnover
+    aliases: []
+    category: returns
+    unit: ratio
+    formula: Revenue / average total assets
+    inputs:
+      revenue: {line_item: revenue}
+      assets_end: {line_item: total_assets}
+      assets_start: {line_item: total_assets}
+    periods: [{same: [revenue, assets_end]}, {later: assets_end, earlier: assets_start}]
+    recipe:
+      - {id: avg_assets, function: average, args: {values: [assets_end, assets_start]}}
+      - {function: ratio, args: {numerator: revenue, denominator: avg_assets}}
+
+  # ---------------- leverage and liquidity ----------------
+  total_debt:
+    name: Total debt
+    aliases: [total borrowings, gross debt]
+    category: leverage
+    unit: currency
+    formula: Current borrowings + non-current borrowings
+    inputs: {current: {line_item: borrowings_current}, non_current: {line_item: borrowings_non_current}}
+    periods: [{same: [current, non_current]}]
+    recipe:
+      - {function: sum_values, args: {values: [current, non_current]}}
+  debt_to_equity:
+    name: Debt-to-equity ratio
+    aliases: [D/E, gearing]
+    category: leverage
+    unit: ratio
+    formula: (Current + non-current borrowings) / total equity
+    inputs:
+      current: {line_item: borrowings_current}
+      non_current: {line_item: borrowings_non_current}
+      equity: {line_item: total_equity}
+    periods: [{same: [current, non_current, equity]}]
+    recipe:
+      - {id: debt, function: sum_values, args: {values: [current, non_current]}}
+      - {function: ratio, args: {numerator: debt, denominator: equity}}
+  net_debt:
+    name: Net debt
+    aliases: []
+    category: leverage
+    unit: currency
+    formula: Current + non-current borrowings − cash and cash equivalents
+    inputs:
+      current: {line_item: borrowings_current}
+      non_current: {line_item: borrowings_non_current}
+      cash: {line_item: cash_and_equivalents}
+    periods: [{same: [current, non_current, cash]}]
+    recipe:
+      - {id: debt, function: sum_values, args: {values: [current, non_current]}}
+      - {function: difference, args: {a: debt, b: cash}}
+    notes: Negative net debt means net cash.
+  interest_coverage:
+    name: Interest coverage ratio
+    aliases: [times interest earned]
+    category: leverage
+    unit: ratio
+    formula: Operating income / |finance costs|
+    inputs: {operating_income: {line_item: operating_income}, finance_costs: {line_item: finance_costs}}
+    periods: [{same: [operating_income, finance_costs]}]
+    recipe:
+      - {id: interest, function: absolute, args: {a: finance_costs}}
+      - {function: ratio, args: {numerator: operating_income, denominator: interest}}
+  current_ratio:
+    name: Current ratio
+    aliases: []
+    category: liquidity
+    unit: ratio
+    formula: Total current assets / total current liabilities
+    inputs: {current_assets: {line_item: current_assets}, current_liabilities: {line_item: current_liabilities}}
+    periods: [{same: [current_assets, current_liabilities]}]
+    recipe:
+      - {function: ratio, args: {numerator: current_assets, denominator: current_liabilities}}
+  quick_ratio:
+    name: Quick ratio
+    aliases: [acid-test ratio]
+    category: liquidity
+    unit: ratio
+    formula: (Total current assets − inventories) / total current liabilities
+    inputs:
+      current_assets: {line_item: current_assets}
+      inventories: {line_item: inventories}
+      current_liabilities: {line_item: current_liabilities}
+    periods: [{same: [current_assets, inventories, current_liabilities]}]
+    recipe:
+      - {id: quick_assets, function: difference, args: {a: current_assets, b: inventories}}
+      - {function: ratio, args: {numerator: quick_assets, denominator: current_liabilities}}
+
+  # ---------------- cash flow ----------------
+  free_cash_flow:
+    name: Free cash flow
+    aliases: [FCF]
+    category: cash_flow
+    unit: currency
+    formula: Cash from operating activities − |capital expenditure|
+    inputs: {operating_cash_flow: {line_item: operating_cash_flow}, capex: {line_item: capital_expenditure}}
+    periods: [{same: [operating_cash_flow, capex]}]
+    recipe:
+      - {id: capex_paid, function: absolute, args: {a: capex}}
+      - {function: difference, args: {a: operating_cash_flow, b: capex_paid}}
+  fcf_margin:
+    name: Free cash flow margin
+    aliases: [FCF margin]
+    category: cash_flow
+    unit: percent
+    formula: (Cash from operating activities − |capital expenditure|) / revenue × 100
+    inputs:
+      operating_cash_flow: {line_item: operating_cash_flow}
+      capex: {line_item: capital_expenditure}
+      revenue: {line_item: revenue}
+    periods: [{same: [operating_cash_flow, capex, revenue]}]
+    recipe:
+      - {id: capex_paid, function: absolute, args: {a: capex}}
+      - {id: fcf, function: difference, args: {a: operating_cash_flow, b: capex_paid}}
+      - {function: margin, args: {part: fcf, whole: revenue}}
+  cash_conversion:
+    name: Cash conversion
+    aliases: [operating cash flow to net income]
+    category: cash_flow
+    unit: ratio
+    formula: Cash from operating activities / net income
+    inputs: {operating_cash_flow: {line_item: operating_cash_flow}, net_income: {line_item: net_income}}
+    periods: [{same: [operating_cash_flow, net_income]}]
+    recipe:
+      - {function: ratio, args: {numerator: operating_cash_flow, denominator: net_income}}
+  dividend_payout:
+    name: Dividend payout ratio
+    aliases: [payout ratio]
+    category: cash_flow
+    unit: percent
+    formula: "|Dividends paid| / net income × 100"
+    inputs: {dividends: {line_item: dividends_paid}, net_income: {line_item: net_income}}
+    periods: [{same: [dividends, net_income]}]
+    recipe:
+      - {id: paid, function: absolute, args: {a: dividends}}
+      - {function: margin, args: {part: paid, whole: net_income}}
+
+  # ---------------- efficiency ----------------
+  inventory_days:
+    name: Inventory days
+    aliases: [days inventory outstanding, DIO]
+    category: efficiency
+    unit: days
+    formula: Average inventories / cost of revenue × 365
+    inputs:
+      inventories_end: {line_item: inventories}
+      inventories_start: {line_item: inventories}
+      cost_of_revenue: {line_item: cost_of_revenue}
+    periods: [{same: [inventories_end, cost_of_revenue]}, {later: inventories_end, earlier: inventories_start}]
+    recipe:
+      - {id: avg_inventory, function: average, args: {values: [inventories_end, inventories_start]}}
+      - {function: days, args: {amount: avg_inventory, base: cost_of_revenue}}
+  receivable_days:
+    name: Receivable days
+    aliases: [days sales outstanding, DSO, debtor days]
+    category: efficiency
+    unit: days
+    formula: Average trade receivables / revenue × 365
+    inputs:
+      receivables_end: {line_item: trade_receivables}
+      receivables_start: {line_item: trade_receivables}
+      revenue: {line_item: revenue}
+    periods: [{same: [receivables_end, revenue]}, {later: receivables_end, earlier: receivables_start}]
+    recipe:
+      - {id: avg_receivables, function: average, args: {values: [receivables_end, receivables_start]}}
+      - {function: days, args: {amount: avg_receivables, base: revenue}}
+
+  # ---------------- BRSR, Principle 6 (BRSR Core attributes 1–4) ----------------
+  energy_intensity_turnover:
+    name: Energy intensity per rupee of turnover
+    aliases: [energy intensity]
+    category: brsr_environment
+    unit: other
+    result_label: per rupee of turnover (in the unit the report prints energy in, usually GJ)
+    formula: Total energy consumed / revenue from operations (in rupees)
+    standard: SEBI BRSR, Principle 6 Essential Indicator 1; BRSR Core Attribute 3
+    inputs: {energy: {line_item: energy_total}, revenue: {line_item: revenue}}
+    periods: [{same: [energy, revenue]}]
+    recipe:
+      - {function: intensity, args: {amount: energy, base: revenue}, constants: {per: "1"}}
+  renewable_energy_share:
+    name: Share of energy from renewable sources
+    aliases: [renewable energy share, green energy share]
+    category: brsr_environment
+    unit: percent
+    formula: Energy consumed from renewable sources / total energy consumed × 100
+    standard: SEBI BRSR, Principle 6 Essential Indicator 1
+    inputs: {renewable: {line_item: energy_renewable}, energy: {line_item: energy_total}}
+    periods: [{same: [renewable, energy]}]
+    recipe:
+      - {function: margin, args: {part: renewable, whole: energy}}
+  water_intensity_turnover:
+    name: Water intensity per rupee of turnover
+    aliases: [water intensity]
+    category: brsr_environment
+    unit: other
+    result_label: kilolitres per rupee of turnover
+    formula: Total water consumption / revenue from operations (in rupees)
+    standard: SEBI BRSR, Principle 6 Essential Indicator 3; BRSR Core Attribute 2
+    inputs: {water: {line_item: water_consumption}, revenue: {line_item: revenue}}
+    periods: [{same: [water, revenue]}]
+    recipe:
+      - {function: intensity, args: {amount: water, base: revenue}, constants: {per: "1"}}
+  scope_1_2_emissions:
+    name: Total Scope 1 and Scope 2 emissions
+    aliases: [GHG emissions, Scope 1 + 2]
+    category: brsr_environment
+    unit: other
+    result_label: tonnes of CO2 equivalent
+    formula: Scope 1 emissions + Scope 2 emissions
+    standard: SEBI BRSR, Principle 6 Essential Indicator 7; BRSR Core Attribute 1
+    inputs: {scope1: {line_item: scope1_emissions}, scope2: {line_item: scope2_emissions}}
+    periods: [{same: [scope1, scope2]}]
+    recipe:
+      - {function: sum_values, args: {values: [scope1, scope2]}}
+  emission_intensity_turnover:
+    name: Scope 1 and 2 emission intensity per rupee of turnover
+    aliases: [emission intensity, GHG intensity, carbon intensity]
+    category: brsr_environment
+    unit: other
+    result_label: tonnes of CO2 equivalent per rupee of turnover
+    formula: (Scope 1 + Scope 2 emissions) / revenue from operations (in rupees)
+    standard: SEBI BRSR, Principle 6 Essential Indicator 7; BRSR Core Attribute 1
+    inputs:
+      scope1: {line_item: scope1_emissions}
+      scope2: {line_item: scope2_emissions}
+      revenue: {line_item: revenue}
+    periods: [{same: [scope1, scope2, revenue]}]
+    recipe:
+      - {id: emissions, function: sum_values, args: {values: [scope1, scope2]}}
+      - {function: intensity, args: {amount: emissions, base: revenue}, constants: {per: "1"}}
+  waste_intensity_turnover:
+    name: Waste intensity per rupee of turnover
+    aliases: [waste intensity]
+    category: brsr_environment
+    unit: other
+    result_label: tonnes per rupee of turnover
+    formula: Total waste generated / revenue from operations (in rupees)
+    standard: SEBI BRSR, Principle 6 Essential Indicator 9; BRSR Core Attribute 4
+    inputs: {waste: {line_item: waste_generated}, revenue: {line_item: revenue}}
+    periods: [{same: [waste, revenue]}]
+    recipe:
+      - {function: intensity, args: {amount: waste, base: revenue}, constants: {per: "1"}}
+  waste_recovery_share:
+    name: Share of waste recovered
+    aliases: [waste recycling rate, waste recovery rate]
+    category: brsr_environment
+    unit: percent
+    formula: Waste recovered through recycling, re-use or other recovery / total waste generated × 100
+    standard: SEBI BRSR, Principle 6 Essential Indicator 9; BRSR Core Attribute 4
+    inputs: {recovered: {line_item: waste_recovered}, generated: {line_item: waste_generated}}
+    periods: [{same: [recovered, generated]}]
+    recipe:
+      - {function: margin, args: {part: recovered, whole: generated}}
+
+  # ---------------- BRSR, people (BRSR Core attributes 5–6) ----------------
+  women_employee_share:
+    name: Share of women among employees
+    aliases: [gender diversity, female employees share]
+    category: brsr_social
+    unit: percent
+    formula: Female employees / total employees × 100
+    standard: SEBI BRSR, Section A Question 18
+    inputs: {female: {line_item: employees_female}, total: {line_item: employees_total}}
+    periods: [{same: [female, total]}]
+    recipe:
+      - {function: margin, args: {part: female, whole: total}}
+  women_board_share:
+    name: Share of women on the Board
+    aliases: [board gender diversity, women directors share]
+    category: brsr_social
+    unit: percent
+    formula: Women directors / Board of Directors × 100
+    standard: SEBI BRSR, Section A Question 20
+    inputs: {female: {line_item: board_female}, total: {line_item: board_total}}
+    periods: [{same: [female, total]}]
+    recipe:
+      - {function: margin, args: {part: female, whole: total}}
+  wellbeing_cost_share:
+    name: Spending on employee well-being as % of revenue
+    aliases: [well-being spend]
+    category: brsr_social
+    unit: percent
+    formula: Cost incurred on well-being measures / revenue × 100
+    standard: SEBI BRSR, Principle 3 Essential Indicator 1(c); BRSR Core Attribute 5
+    inputs: {wellbeing: {line_item: wellbeing_cost}, revenue: {line_item: revenue}}
+    periods: [{same: [wellbeing, revenue]}]
+    recipe:
+      - {function: margin, args: {part: wellbeing, whole: revenue}}
+    notes: BRSR says "total revenue of the company"; check whether the report divides by revenue from operations or total income.
+  ltifr:
+    name: Lost Time Injury Frequency Rate
+    aliases: [LTIFR]
+    category: brsr_social
+    unit: other
+    result_label: lost-time injuries per million person-hours worked
+    formula: Lost-time injuries / person-hours worked × 1,000,000
+    standard: SEBI BRSR, Principle 3 Essential Indicator 11; BRSR Core Attribute 5
+    inputs: {injuries: {line_item: lost_time_injuries}, hours: {line_item: person_hours_worked}}
+    periods: [{same: [injuries, hours]}]
+    recipe:
+      - {function: intensity, args: {amount: injuries, base: hours}, constants: {per: "1000000"}}
+
+  # ---------------- CSR ----------------
+  csr_spend_ratio:
+    name: CSR spend as % of average net profit
+    aliases: [CSR spend ratio]
+    category: csr
+    unit: percent
+    formula: CSR amount spent / average net profit as per section 135(5) × 100
+    standard: Companies Act 2013, section 135 (statutory minimum 2 %)
+    inputs: {spent: {line_item: csr_amount_spent}, average_net_profit: {line_item: csr_average_net_profit}}
+    periods: [{same: [spent, average_net_profit]}]
+    recipe:
+      - {function: margin, args: {part: spent, whole: average_net_profit}}
+    notes: Uses the section 198 average net profit printed in the CSR annexure, not the reported profit after tax.
+  csr_obligation_spent:
+    name: Share of the CSR obligation spent
+    aliases: []
+    category: csr
+    unit: percent
+    formula: CSR amount spent / total CSR obligation × 100
+    standard: Companies Act 2013, section 135
+    inputs: {spent: {line_item: csr_amount_spent}, obligation: {line_item: csr_obligation}}
+    periods: [{same: [spent, obligation]}]
+    recipe:
+      - {function: margin, args: {part: spent, whole: obligation}}

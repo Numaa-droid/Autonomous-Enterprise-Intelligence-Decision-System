@@ -65,6 +65,9 @@ class Settings(BaseSettings):
     task_retry_backoff_seconds: float = Field(default=5.0, ge=0, le=600)  # doubled per attempt
     workflow_max_rework_rounds: int = Field(default=1, ge=0, le=5)
     stub_agent_delay_seconds: float = Field(default=0.0, ge=0, le=120)  # demo / crash tests
+    # M4: "llm" runs the LLM agents, "stub" the M3 stand-ins, "auto" the LLM agents when an
+    # OpenRouter key is set (D-025)
+    agent_mode: Literal["auto", "llm", "stub"] = "auto"
 
     # --- run tracing (D-022): spans stored in Postgres, shown in the dashboard ---
     tracing_enabled: bool = True

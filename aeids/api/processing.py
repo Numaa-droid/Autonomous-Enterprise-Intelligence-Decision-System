@@ -76,9 +76,9 @@ def schedule_processing(
 
 def registry(state: Any):
     if getattr(state, "registry", None) is None:
-        from aeids.agents.stubs import default_registry
+        from aeids.agents.registry import build_registry
 
-        state.registry = default_registry()
+        state.registry = build_registry(state.settings)
     return state.registry
 
 

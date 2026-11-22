@@ -571,14 +571,21 @@ def build_report(session: Session, wf: Workflow, tasks: list[AgentTask]) -> dict
             .join(FindingEvidence, FindingEvidence.evidence_record_id == EvidenceRecord.id)
             .join(DocumentVersion, DocumentVersion.id == EvidenceRecord.version_id)
             .where(FindingEvidence.finding_id == f.id)).all()
-        findings.append({"finding_id": str(f.id), "claim": f.claim, "value": f.value, "unit": f.unit,
-                         "currency": f.currency, "scale": f.scale, "period": f.period,
+        calc = session.scalar(select(CalculationRecord).where(CalculationRecord.finding_id == f.id))
+        findings.append({"finding_id": str(f.id), "category": f.category, "claim": f.claim, "value": f.value,
+                         "unit": f.unit, "currency": f.currency, "scale": f.scale, "period": f.period,
+                         "calculation": None if calc is None else {
+                             "function": calc.function, "formula": calc.formula, "inputs": calc.inputs,
+                             "output": calc.output, "calc_version": calc.calc_version},
                          "evidence": [{"evidence_id": str(e.id), "file": name, "page": e.page,
                                        "section": e.section, "quote": e.quote[:400]} for e, name in ev]})
     superseded = {t.parent_task_id for t in tasks if t.parent_task_id}
     limitations = [f"{t.plan_key} ({t.agent_name}) ended {t.status}"
                    + (f": {t.last_error[:200]}" if t.last_error else "")
                    for t in tasks if t.status != T.VERIFIED.value and t.id not in superseded]
+    not_found = [m for t in tasks if t.id not in superseded for m in (t.output_json or {}).get("not_found") or []]
+    if not_found:  # values the agents looked for and did not find: said, never estimated
+        limitations.append("Not found in the reports: " + ", ".join(dict.fromkeys(not_found)))
     return {"query": wf.query, "generated_at": utcnow().isoformat(), "verified_findings": findings,
             "limitations": limitations,
             "notice": "Decision support only: not a legal, financial or compliance determination."}

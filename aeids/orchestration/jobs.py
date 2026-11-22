@@ -15,7 +15,7 @@ from typing import Any
 from sqlalchemy import select
 
 from aeids import tracing
-from aeids.agents.stubs import default_registry
+from aeids.agents.registry import build_registry
 from aeids.config import Settings, get_settings
 from aeids.db.models import AgentTask, TaskStatus, Workflow, WorkflowStatus
 from aeids.db.session import make_engine, make_sessionmaker
@@ -75,9 +75,10 @@ class _Env:
         self.sessions = make_sessionmaker(self.engine)
         self.index = VectorIndex.from_url(self.settings.qdrant_url)
         self.embedder = OpenRouterEmbedder.from_settings(self.settings, cache=SqlQueryCache(self.engine))
-        self.registry = default_registry()
+        self.registry = build_registry(self.settings)
 
     def close(self) -> None:
+        self.registry.close()
         self.embedder.client.close()
         self.index.close()
         self.engine.dispose()

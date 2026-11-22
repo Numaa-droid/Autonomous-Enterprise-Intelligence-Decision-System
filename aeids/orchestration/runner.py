@@ -20,6 +20,7 @@ import time
 import uuid
 from collections.abc import Callable
 from datetime import datetime, timedelta
+from decimal import Decimal, InvalidOperation
 
 from pydantic import ValidationError
 from sqlalchemy import select, update
@@ -82,9 +83,11 @@ def build_message(session: Session, task: AgentTask) -> TaskMessage:
         .where(TaskDependency.task_id == task.id)))
     for d in deps:
         out = d.output_json or {}
-        for key in ("evidence_ids", "sources"):
+        for key in ("evidence_ids", "sources", "facts", "not_found"):
             if key in out:
                 inputs[key] = [*inputs.get(key, []), *out[key]]
+    if task.attempts > 1 and task.last_error:  # a retry sees why the last attempt failed (rule 8)
+        inputs["previous_error"] = task.last_error[:1000]
     return TaskMessage(
         workflow_id=task.workflow_id, task_id=task.id, parent_task_id=task.parent_task_id,
         rework_round=task.rework_round, idempotency_key=task.idempotency_key,
@@ -93,6 +96,19 @@ def build_message(session: Session, task: AgentTask) -> TaskMessage:
         acceptance_criteria=list(task.acceptance_criteria or []),
         constraints=TaskConstraints(max_attempts=task.max_attempts, timeout_seconds=task.timeout_seconds),
         deadline=task.deadline, trace_id=task.trace_id, attempt=task.attempts)
+
+
+def _usage_from_metrics(info: sup.RunInfo, metrics: dict) -> None:
+    """Model, tokens and cost an agent reports in its metrics, for ``agent_runs``."""
+    if isinstance(metrics.get("total_tokens"), int):
+        info.total_tokens = metrics["total_tokens"]
+    if metrics.get("cost_usd") is not None:
+        try:
+            info.cost_usd = Decimal(str(metrics["cost_usd"]))
+        except InvalidOperation:
+            pass
+    if isinstance(metrics.get("llm_model"), str):
+        info.model = metrics["llm_model"][:200]
 
 
 def run_task(sessions: sessionmaker, task_id: uuid.UUID, *, registry: Registry, settings: Settings,
@@ -128,6 +144,7 @@ def run_task(sessions: sessionmaker, task_id: uuid.UUID, *, registry: Registry, 
                 ctx = AgentContext(read_session, tenant_id, settings, index, embedder)
                 raw = agent.run(message, ctx)
             result = AgentResult.model_validate(raw.model_dump(mode="json"))  # never trust the type
+            _usage_from_metrics(info, result.metrics)
             sp.set_output({"status": result.status, "findings": len(result.findings),
                            "evidence": len(result.evidence), "warnings": result.warnings})
         except ValidationError as exc:

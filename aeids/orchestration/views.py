@@ -13,6 +13,7 @@ from aeids.db.models import (
     AgentRun,
     AgentTask,
     AuditEvent,
+    CalculationRecord,
     DocumentVersion,
     EvidenceRecord,
     FindingEvidence,
@@ -77,6 +78,15 @@ def tasks(session: Session, wf: Workflow) -> list[dict[str, Any]]:
              "created_at": aware(t.created_at), "updated_at": aware(t.updated_at)} for t in rows]
 
 
+def calculation(session: Session, finding_id: uuid.UUID) -> dict[str, Any] | None:
+    """The stored calculation behind a finding (rule 2), or None for a reported value."""
+    c = session.scalar(select(CalculationRecord).where(CalculationRecord.finding_id == finding_id))
+    if c is None:
+        return None
+    return {"function": c.function, "formula": c.formula, "inputs": c.inputs, "output": c.output,
+            "unit": c.unit, "currency": c.currency, "scale": c.scale, "calc_version": c.calc_version}
+
+
 def findings(session: Session, wf: Workflow) -> list[dict[str, Any]]:
     out = []
     for f in session.scalars(select(FindingRecord).where(FindingRecord.workflow_id == wf.id)
@@ -94,6 +104,7 @@ def findings(session: Session, wf: Workflow) -> list[dict[str, Any]]:
         out.append({"id": f.id, "task_id": f.task_id, "category": f.category, "claim": f.claim,
                     "value": f.value, "unit": f.unit, "currency": f.currency, "scale": f.scale,
                     "period": f.period, "verification_status": f.verification_status,
+                    "calculation": calculation(session, f.id),
                     "evidence": evidence, "verifications": checks})
     return out
 

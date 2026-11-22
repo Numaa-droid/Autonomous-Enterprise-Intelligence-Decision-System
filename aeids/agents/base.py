@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from aeids.config import Settings
 from aeids.contracts import AgentResult, TaskMessage
-from aeids.db.models import DocumentChunk, DocumentVersion, EvidenceRecord
+from aeids.db.models import Company, Document, DocumentChunk, DocumentVersion, EvidenceRecord
 from aeids.llm.embedding import Embedder
 from aeids.retrieval.search import SearchFilters, SearchHit, search
 from aeids.retrieval.vector_index import VectorIndex
@@ -75,10 +75,53 @@ class AgentContext:
                                     ev.quote, text, filename)
                 for ev, text, filename in rows}
 
+    def companies(self) -> list[CompanyView]:
+        """Companies of this tenant with at least one current (searchable) report version."""
+        rows = self._session.execute(
+            select(Company.id, Company.name)
+            .join(Document, Document.company_id == Company.id)
+            .join(DocumentVersion, DocumentVersion.document_id == Document.id)
+            .where(Company.tenant_id == self.tenant_id, DocumentVersion.is_current.is_(True))
+            .distinct().order_by(Company.name)).all()
+        return [CompanyView(cid, name) for cid, name in rows]
+
+    def chunks(self, ids: list[uuid.UUID]) -> dict[uuid.UUID, ChunkView]:
+        """Chunks of this tenant with their metadata (normalised table rows for tables)."""
+        if not ids:
+            return {}
+        rows = self._session.execute(
+            select(DocumentChunk).where(DocumentChunk.id.in_(ids),
+                                        DocumentChunk.tenant_id == self.tenant_id)).scalars()
+        return {c.id: ChunkView(c.id, c.version_id, c.page_start, c.page_end, c.section, c.text,
+                                dict(c.meta or {})) for c in rows}
+
+
+@dataclass(frozen=True)
+class CompanyView:
+    company_id: uuid.UUID
+    name: str
+
+
+@dataclass(frozen=True)
+class ChunkView:
+    chunk_id: uuid.UUID
+    version_id: uuid.UUID
+    page_start: int
+    page_end: int
+    section: str | None
+    text: str
+    meta: dict
+
 
 class Registry:
-    def __init__(self, agents: list[Agent]) -> None:
+    def __init__(self, agents: list[Agent], closers: list | None = None) -> None:
         self._agents = {a.name: a for a in agents}
+        self._closers = list(closers or [])
+
+    def close(self) -> None:
+        """Release what the agents hold (e.g. the LLM client's connections)."""
+        for close in self._closers:
+            close()
 
     def get(self, name: str) -> Agent:
         try:

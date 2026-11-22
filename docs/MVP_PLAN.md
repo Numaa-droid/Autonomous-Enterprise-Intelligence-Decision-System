@@ -57,6 +57,7 @@ Build vertically: get one question flowing end to end before polishing any singl
 - Calculation module (see §4) with full unit tests
 - Financial Analyst: chooses which calc functions to call; the LLM never computes numbers; findings carry a stored calculation (function, formula, typed inputs, output) and evidence IDs
 - **Done when:** "Compare revenue and operating margin FY2023–FY2025" returns schema-valid findings with evidence.
+- **Status:** done (D-025; metric knowledge base D-026). Shown live on Apple's 10-K: 6 reported values and 5 calculations, all verified; `tests/test_agents_m4.py`, `tests/test_calc.py`.
 
 ### M5 — Verification + rework loop
 - Replays every calculation from `calculations` and compares output
