@@ -14,7 +14,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from aeids.config import Settings
@@ -188,6 +188,22 @@ class AgentContext:
             .where(Company.tenant_id == self.tenant_id, DocumentVersion.is_current.is_(True))
             .distinct().order_by(Company.name)).all()
         return [CompanyView(cid, name) for cid, name in rows]
+
+    def esg_sources(self, company_ids: list[uuid.UUID]) -> set[uuid.UUID]:
+        """The companies (of ``company_ids``) with an ESG source among their current reports: an
+        ESG report or a BRSR, or an annual report with a BRSR / sustainability section (D-035)."""
+        from aeids import doctype
+
+        if not company_ids:
+            return set()
+        current = (select(Document.company_id)
+                   .join(DocumentVersion, DocumentVersion.document_id == Document.id)
+                   .where(Document.tenant_id == self.tenant_id, Document.company_id.in_(company_ids),
+                          DocumentVersion.is_current.is_(True)))
+        typed = current.where(Document.document_type.in_(sorted(doctype.ESG_FAMILY)))
+        with_section = (current.join(DocumentChunk, DocumentChunk.version_id == DocumentVersion.id)
+                        .where(or_(*[func.lower(DocumentChunk.section).like(p) for p in doctype.ESG_SECTION_PATTERNS])))
+        return set(self._session.scalars(typed.distinct())) | set(self._session.scalars(with_section.distinct()))
 
     def chunks(self, ids: list[uuid.UUID]) -> dict[uuid.UUID, ChunkView]:
         """Chunks of this tenant with their metadata (normalised table rows for tables)."""

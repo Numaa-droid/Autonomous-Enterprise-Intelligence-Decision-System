@@ -78,3 +78,24 @@ INCOME_ROWS = [
 ]
 INCOME_SUBTITLE = ("(In millions, except number of shares, which are reflected in thousands, "
                    "and per-share amounts)")
+
+
+def text_pdf(pages: list[str], tag: str = "") -> bytes:
+    """A PDF whose pages hold the given text (Helvetica), so its type can be read (D-035)."""
+    from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
+
+    writer = PdfWriter()
+    font = writer._add_object(DictionaryObject({
+        NameObject("/Type"): NameObject("/Font"), NameObject("/Subtype"): NameObject("/Type1"),
+        NameObject("/BaseFont"): NameObject("/Helvetica")}))
+    for text in pages:
+        page = writer.add_blank_page(width=612, height=792)
+        lines = [ln.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)") for ln in text.splitlines() or [""]]
+        stream = DecodedStreamObject()
+        stream.set_data(("BT /F1 11 Tf 14 TL 72 740 Td " + " ".join(f"({ln}) '" for ln in lines) + " ET").encode("latin-1"))
+        page[NameObject("/Contents")] = writer._add_object(stream)
+        page[NameObject("/Resources")] = DictionaryObject({NameObject("/Font"): DictionaryObject({NameObject("/F1"): font})})
+    writer.add_metadata({"/Title": f"test {tag}"})
+    buf = io.BytesIO()
+    writer.write(buf)
+    return buf.getvalue()

@@ -32,7 +32,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from aeids import knowledge
+from aeids import doctype, knowledge
 from aeids.agents.base import AgentContext, ChunkView, CompanyView
 from aeids.agents.cells import FY, column_name, read_cell, row_line
 from aeids.agents.document_intelligence.resolver import RESOLVER_VERSION, CellResolver
@@ -118,6 +118,15 @@ def _units_text(unit: str, currency: str | None, scale: str | None) -> str:
     return " ".join(p for p in parts if p)
 
 
+def _no_esg_source(companies: list[str]) -> str:
+    """Why an ESG question cannot be answered: only annual reports (without a BRSR section) (D-035)."""
+    names = ", ".join(dict.fromkeys(companies)) or "the companies asked about"
+    return ("this is an ESG question (emissions, energy, water, waste, safety or BRSR), but only annual reports "
+            f"without an ESG / BRSR section are uploaded for {names}. AEIDS does not answer ESG questions from an "
+            "annual report: upload the company's ESG / sustainability report or BRSR (on the Reports page, with "
+            "the type ESG report or BRSR), then re-run")
+
+
 class DocumentIntelligenceAgent:
     name = "document_intelligence"
     version = "1.0"
@@ -144,6 +153,9 @@ class DocumentIntelligenceAgent:
             available = [c for c in available if c.company_id in base_filters.company_ids]
         if not available:
             return self._needs(task, usage, "no company in this workflow's scope has a searchable report")
+        esg_question = doctype.needs_esg_report(query)
+        if esg_question and not ctx.esg_sources([c.company_id for c in available]):
+            return self._needs(task, usage, _no_esg_source([c.name for c in available]))  # before any model call
 
         plan = ask_json(self._llm, QuestionPlan, self._plan_prompt,
                         self._plan_message(query, available, task), usage, model=self.model)
@@ -155,6 +167,15 @@ class DocumentIntelligenceAgent:
                                + "; AEIDS does not answer from another company's reports")
         companies = [by_name[m.match] for m in plan.companies if m.match] or available
         companies = list({c.company_id: c for c in companies}.values())
+        if esg_question:  # an ESG question is answered from ESG sources only, never from an annual report (D-035)
+            have = ctx.esg_sources([c.company_id for c in companies])
+            named = any(m.match for m in plan.companies)
+            lacking = [c.name for c in companies if c.company_id not in have]
+            if named and lacking:
+                return self._needs(task, usage, _no_esg_source(lacking))
+            companies = [c for c in companies if c.company_id in have]
+            if not companies:
+                return self._needs(task, usage, _no_esg_source(lacking))
 
         if not plan.metrics and (named := self._matcher.named_in(query)):
             # the planner listed no line item, yet the question names one word for word (D-030)

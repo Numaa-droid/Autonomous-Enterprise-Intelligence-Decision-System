@@ -79,6 +79,7 @@ def upload_document(
     staged = docs.stage_upload(
         file.file, file.filename, store.staging_dir(), settings.max_upload_bytes
     )
+    docs.check_document_type(staged, document_type)  # an annual report is not an ESG report (D-035)
     outcome = docs.create_document(
         session,
         store,
@@ -109,10 +110,11 @@ def upload_version(
 ) -> UploadOut:
     """Upload a replacement version. Same bytes as an existing version of this document →
     200 with that version; the current pointer is unchanged."""
-    docs.get_document(session, tenant_id, document_id)  # 404 before reading the upload
+    document = docs.get_document(session, tenant_id, document_id)  # 404 before reading the upload
     staged = docs.stage_upload(
         file.file, file.filename, store.staging_dir(), settings.max_upload_bytes
     )
+    docs.check_document_type(staged, document.document_type)  # a new version is the same kind of report
     outcome = docs.add_version(session, store, tenant_id, document_id, staged)
     return _upload_out(request, session, store, tenant_id, outcome, response)
 

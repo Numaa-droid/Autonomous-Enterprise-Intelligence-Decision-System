@@ -53,6 +53,60 @@ Record each design or library choice in a few lines: what was chosen, what else 
 
 ## Accepted decisions
 
+### D-035 — Document type is checked on upload; ESG questions need an ESG source
+- Date: 2026-11-24
+- Status: accepted
+- Decision:
+  - **Upload** (`aeids/doctype.py`, `documents.check_document_type`, both upload routes):
+    - AEIDS reads the text of the first 5 pages and up to 10 sampled pages (pypdf, under 1 s on the corpus).
+    - It classifies the PDF by the title that comes first: "Form 10-K" / "20-F" / "Annual Report", "Sustainability / ESG / Impact Report", or "Business Responsibility and Sustainability Report".
+    - Without a title, the content decides: financial statements and auditor's reports; Scope 1/2, GHG, GRI, TCFD; or BRSR's general disclosures, principles and indicators.
+    - A cross-family choice (annual vs ESG / BRSR) is refused with 422 `document_type_mismatch` and the reason ("page 1 says "Form 10-K""). The staged file is discarded.
+    - A new version must be of the document's type.
+    - Not checked: a PDF without text (scanned), and type `other`.
+    - An annual report that contains its BRSR (common in India) is an annual report: uploading it as a BRSR is refused with a hint to upload it as an annual report.
+  - **Questions:**
+    - `needs_esg_report` decides which questions are ESG-only: emissions, energy use or intensity, renewable energy, water, waste, LTIFR / injuries, CSR spend, BRSR, sustainability. Headcount, board members and "energy storage" are not: annual reports disclose them.
+    - Document Intelligence answers such a question only from companies with an ESG source (`AgentContext.esg_sources`): a current ESG report or BRSR, or an annual report with a BRSR / sustainability section heading.
+    - If no company in scope has one, it stops before any model call. If a named company has none, it stops too. Either way the task waits for a person with the reason and what to upload, the same as for a company with no report. Re-run works after the upload.
+    - If no company is named, only companies with an ESG source are searched.
+- Alternatives considered:
+  - Asking the model to classify the PDF: slower, costs tokens, and is not deterministic.
+  - Checking only after parsing: the wrong type would already be stored and processed.
+  - Answering ESG questions from annual reports: 10-Ks mention climate only in passing, so answers would be guesses.
+- Why: the user asked that an annual report uploaded as an ESG report be refused, and that an ESG question about annual reports not be answered.
+- Consequences / follow-ups:
+  - Tests in `tests/test_doctype_d035.py`; the 7 that expect a refusal fail without the checks.
+  - All five corpus 10-Ks are classified as annual reports.
+  - None of the 68 benchmark questions is ESG-only.
+
+### D-034 — Security review: local-only request guard, hidden database URL, private .env, strong database password
+- Date: 2026-11-24
+- Status: accepted
+- Decision:
+  - **Request guard:** `aeids/api/security.py` (`LocalOnlyGuard`, added in `create_app`):
+    - **Host check:** refuses a request whose `Host` is not in `AEIDS_ALLOWED_HOSTS` (default `127.0.0.1`, `localhost`, `::1`) with 400 `host_not_allowed`. This closes DNS rebinding, where a site points its own name at 127.0.0.1 and reads the API as that site.
+    - **Cross-site writes:** refuses a POST, PUT, PATCH or DELETE that a browser marks as coming from another site (`Origin` not an allowed host, `Origin: null`, or `Sec-Fetch-Site: cross-site`) with 403 `cross_site_request`. A page on another site could otherwise upload a PDF with a plain form POST and spend embeddings.
+    - **Not affected:** requests without those headers (curl, scripts, the CLI) and the console itself (same origin).
+  - **Hidden database URL:** `Settings.database_url` is `repr=False`, so printed settings and tracebacks never show the database password. The OpenRouter key was already a `SecretStr`.
+  - **Local fixes:**
+    - `.env` set to mode 600;
+    - the Postgres role's placeholder password replaced with a random 32-character one (`ALTER ROLE`, and the same in `.env`);
+    - `.env.example` now says to use a strong password and `chmod 600`.
+- Alternatives considered:
+  - Starlette's `TrustedHostMiddleware`: it mishandles `[::1]:port`.
+  - CSRF tokens: heavier, and the console has no login or sessions.
+  - CORS middleware: AEIDS needs no cross-origin access, and without CORS headers browsers already withhold responses.
+- Why: a security review found the OpenRouter key well protected:
+  - never committed, logged, traced or printed;
+  - sent only to OpenRouter, and scrubbed from errors;
+  - a USD 3 lifetime spending cap on the key, no request-rate limit (paid key), expiry 2027-02-18.
+  But the local API could be reached from a web page in the user's own browser.
+- Consequences / follow-ups:
+  - Tests: `tests/test_security_d034.py` (foreign hosts, cross-site uploads and questions, same-origin and scripted writes, printed settings). The guard tests were confirmed to fail without the guard.
+  - To serve the API under another name (a reverse proxy), add that name to `AEIDS_ALLOWED_HOSTS`.
+  - Real authentication stays deferred (Release 0 scope).
+
 ### D-033 — Earnings per share in the knowledge base (1.1); per-share labels match only per-share line items; an ambiguous-label benchmark question
 - Date: 2026-11-23
 - Status: accepted

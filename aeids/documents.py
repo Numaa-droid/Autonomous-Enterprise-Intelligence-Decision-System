@@ -68,6 +68,24 @@ class DocumentNotFound(DocumentError):
     http_status = 404
 
 
+class DocumentTypeMismatch(DocumentError):
+    """The PDF is of the other family than the chosen document type (annual vs ESG / BRSR, D-035)."""
+
+    code = "document_type_mismatch"
+    http_status = 422
+
+
+def check_document_type(staged: StagedFile, document_type: DocumentType | str) -> None:
+    """Refuse (and discard) an upload whose content contradicts its chosen type (D-035)."""
+    from aeids import doctype
+
+    chosen = document_type.value if isinstance(document_type, DocumentType) else str(document_type)
+    message = doctype.mismatch_message(chosen, doctype.classify_pdf(staged.path))
+    if message:
+        staged.discard()
+        raise DocumentTypeMismatch(message)
+
+
 @dataclass(frozen=True)
 class StagedFile:
     path: Path

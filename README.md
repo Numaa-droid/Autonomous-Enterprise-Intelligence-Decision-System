@@ -374,7 +374,7 @@ Then open **http://127.0.0.1:8001/ui**: upload a report on **Reports**, ask a qu
 6. `.venv/bin/python eval/run_benchmark.py` compares AEIDS with the single-prompt baseline on 37 questions (about USD 0.04).
 
 > [!WARNING]
-> The console has no login. Keep the API bound to `127.0.0.1`.
+> The console has no login. Keep the API bound to `127.0.0.1`. The API also answers only requests addressed to this machine (`AEIDS_ALLOWED_HOSTS`) and refuses changes requested from another website, so a web page you visit cannot read your documents or spend your OpenRouter key (D-034). Keep `.env` private (`chmod 600 .env`), give the database a strong password, and set a spending limit on your OpenRouter key.
 
 <details>
 <summary><b>FAQ</b></summary>
@@ -471,6 +471,12 @@ curl -F file=@report.pdf -F company_name="Acme Ltd" -F document_type=annual_repo
 curl -F file=@report-v2.pdf http://127.0.0.1:8001/api/v1/documents/<document_id>/versions
 curl http://127.0.0.1:8001/api/v1/documents/<document_id>/versions
 ```
+
+The document type must match the PDF (D-035):
+- **The check:** AEIDS reads the cover and a sample of pages ("Form 10-K", "Annual Report", "Sustainability Report", "Business Responsibility and Sustainability Report", financial statements, Scope 1/2 emissions, BRSR principles).
+- **A mismatch is refused** with the reason (HTTP 422 `document_type_mismatch`), for example an annual report uploaded as `esg_report`, or the reverse. A new version must be the same kind as the first.
+- **Not checked:** scanned PDFs without a text layer, and `other`.
+- **ESG questions:** about emissions, energy use, water, waste, workplace injuries or BRSR. They are answered only from an ESG source: an ESG report, a BRSR, or an annual report with a BRSR section. Otherwise AEIDS stops before any model call and says which report to upload.
 
 ### Automatic parsing with TableLens
 
