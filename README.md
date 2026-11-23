@@ -8,7 +8,7 @@
   <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-source%20of%20truth-8b5cf6?style=flat-square">
   <img alt="Qdrant" src="https://img.shields.io/badge/Qdrant-hybrid%20search-2dd4bf?style=flat-square">
   <img alt="Agents" src="https://img.shields.io/badge/agents-Supervisor%20%C2%B7%20Analyst%20%C2%B7%20Verifier-a78bfa?style=flat-square">
-  <img alt="Status" src="https://img.shields.io/badge/Release%200-M1%E2%80%93M6%20done-22c55e?style=flat-square">
+  <img alt="Status" src="https://img.shields.io/badge/Release%200-M1%E2%80%93M7%20done-22c55e?style=flat-square">
 </p>
 
 <p align="center">
@@ -336,6 +336,7 @@ AEIDS is about 2 s slower and calculates and compares reliably, and every number
 > **Metric knowledge base:** [`aeids/knowledge/metrics.yaml`](aeids/knowledge/metrics.yaml) defines 41 metrics (margins, growth, ROE, free cash flow, leverage, BRSR intensities, women's representation, LTIFR, CSR spend) as fixed recipes of tested calculation steps, plus how US GAAP, Ind AS and BRSR reports name each line item. The agents pick a metric and the facts; code runs the recipe.
 > **New in M5:** Verification replays every calculation and checks every value against the table cell it came from (value, page, unit, currency, scale, period, current version). Wrong findings go back for at most two rework rounds; what still fails is dropped and listed as a limitation; what cannot be checked automatically waits for a person in the console.
 > **New in M6:** a single-agent RAG baseline and one command that benchmarks both on 36 questions: AEIDS answers 92% correctly vs 69%, with no unchecked numbers (baseline: 12%), at a median 4.6 s and USD 0.0004 per question ([results](#does-aeids-beat-one-rag-prompt)).
+> **New in M7:** every completed question gets a stored, checked report (JSON and Markdown): the answer, every calculation with its inputs, numbered sources down to the page and evidence record, limitations, review status and how it was made. Before it is stored, code checks that it contains every verified finding and nothing else. A report that fails the check is not stored, and the workflow fails instead. Download it from the answer page, `GET /api/v1/workflows/{id}/report.md`, or `python -m aeids.reporting <id>`.
 > **Not yet:** values printed only in prose or charts are not extracted.
 
 | Milestone | State |
@@ -347,7 +348,7 @@ AEIDS is about 2 s slower and calculates and compares reliably, and every number
 | M4 LLM Document Intelligence and Financial Analyst, calculation module (D-025) | ✅ done |
 | M5 Verification replays calculations and checks quoted values; bounded rework; human review; fault-injection tests (D-027) | ✅ done |
 | M6 Single-agent RAG baseline and benchmark (AEIDS vs baseline, D-029); fewer and smaller model calls (D-030) | ✅ done |
-| M7 Report output and polish | ⏳ next |
+| M7 Checked, versioned reports (JSON + Markdown) with citations, limitations and review status; report API, console download, CLI (D-031) | ✅ done |
 
 ## Quick start
 
@@ -359,7 +360,16 @@ cp .env.example .env        # set AEIDS_DB_PASSWORD (and the same in AEIDS_DATAB
 ./start.sh                  # Postgres, Qdrant, Redis, migrations, TableLens, API and worker
 ```
 
-Then open **http://127.0.0.1:8001/ui**: upload a report on **Documents**, ask a question on **Workflows**, and watch every step on **Traces**.
+Then open **http://127.0.0.1:8001/ui**: upload a report on **Reports**, ask a question on **Ask a question**, and watch every step on **Run history**.
+
+**A five-minute demo** (no GPU needed; it uses the five reports the benchmark loads):
+
+1. `.venv/bin/python eval/run_retrieval.py` loads Apple, Microsoft, NVIDIA, Tesla and Alphabet into the `eval` workspace (once, about USD 0.006).
+2. In the console, pick the **eval** workspace (top right), open **Ask a question** and ask *"Compare the net profit margins of Alphabet in 2025 and Apple in fiscal year 2025."*
+3. The answer page shows the two margins, the four figures they come from (with file and page), and a plain-English summary. Open **How AEIDS got this answer** to see the task plan, each check and the timeline.
+4. Click **Download the report (Markdown)**. The file has the answer, each calculation with its cited inputs, limitations, review status and numbered sources.
+5. Ask something the reports cannot answer (*"What were Apple's total net sales in fiscal year 2030?"*): AEIDS says so instead of guessing.
+6. `.venv/bin/python eval/run_benchmark.py` compares AEIDS with the single-prompt baseline on 36 questions (about USD 0.02).
 
 > [!WARNING]
 > The console has no login. Keep the API bound to `127.0.0.1`.
@@ -416,6 +426,8 @@ Then open **http://127.0.0.1:8001/ui**: upload a report on **Documents**, ask a 
 | [`aeids/orchestration/`](aeids/orchestration/) | Supervisor, state machines, workers with leases |
 | [`aeids/agents/`](aeids/agents/) | The agents: Document Intelligence, Financial Analyst, Verification (and the M3 stand-ins) |
 | [`aeids/llm/`](aeids/llm/) | The single entry point for model calls (OpenRouter), with retries and cost tracking |
+| [`aeids/reporting/`](aeids/reporting/) | The answer arranged from verified findings, and the checked, stored report (JSON + Markdown) |
+| [`aeids/baseline/`](aeids/baseline/), [`aeids/evaluation/`](aeids/evaluation/) | The single-prompt RAG baseline and the benchmark scoring used for both systems |
 | [`tablelens/`](tablelens/README.md) | PDF parsing pipeline, run as its own service |
 | [`eval/`](eval/) | Benchmark questions, corpus list and runners |
 | [`docs/`](docs/) | [Architecture](docs/ARCHITECTURE.md), [MVP plan](docs/MVP_PLAN.md), [decision log](docs/DECISIONS.md) |
@@ -517,6 +529,26 @@ curl -s http://127.0.0.1:8001/api/v1/workflows -H 'content-type: application/jso
 ```
 
 The Supervisor plans a task graph (`extract` → `analyse`, plus a `verify` task for every task with findings), the worker runs it, and every state change is saved. `GET /api/v1/workflows/{id}/tasks` shows the graph with attempts and transitions, `/findings` the claims with their evidence quotes, `/{id}` the report (verified findings only), and `POST /{id}/reviews` lets a person approve, reject or re-run a task waiting for review (also in the console). With an OpenRouter key the agents are the M4 LLM agents (`AEIDS_AGENT_MODE=auto`; `stub` runs the M3 stand-ins without model calls): reported values come from table cells, calculations from `aeids/calc/`, and each calculated finding carries its stored calculation in `/findings` and in the report.
+
+When a workflow completes, its report is checked and stored (table `reports`, schema `report/1.0`, D-031):
+
+```bash
+curl -s http://127.0.0.1:8001/api/v1/workflows/<id>/report        # metadata + content as JSON (409 until completed)
+curl -sOJ http://127.0.0.1:8001/api/v1/workflows/<id>/report.md   # the Markdown file
+.venv/bin/python -m aeids.reporting <id> --tenant eval -o reports/answer.md   # same, from the command line (--json for JSON)
+```
+
+The report has these parts:
+- **Status:** complete, partial or nothing verified.
+- **Summary:** the plain-English text, marked as AI-written or a template.
+- **Answer:** calculated results, reported figures and cited passages.
+- **Calculations in detail:** each formula with its typed inputs, each input linked to its source.
+- **Limitations:** values not found, findings dropped after verification, tasks that did not finish.
+- **Review:** the automatic checks, and every human decision with reviewer, time and note.
+- **Sources:** numbered, each with file, company, page, section, document version (and whether it is still current), quote and evidence id.
+- **How it was made:** models, prompt versions, calc version, tokens, cost and trace id.
+
+Text taken from the reports is escaped, so it can never become a link, image or HTML in the Markdown. Workflows completed before M7 get their report the first time it is requested.
 
 ## Search
 

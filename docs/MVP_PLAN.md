@@ -80,6 +80,7 @@ Build vertically: get one question flowing end to end before polishing any singl
 - `GET /api/v1/workflows/{id}/findings`, `GET /api/v1/workflows/{id}/report`
 - README with architecture diagram, benchmark table, demo instructions (keep the TableLens setup section)
 - Only then consider Release 1 agents
+- **Status:** done (D-031). Every completed workflow has a stored report (`reports`, schema `report/1.0`, JSON + Markdown). It is checked by code against the database before it is stored; a report that fails the check fails the workflow. It is served by `GET /api/v1/workflows/{id}/report` and `/report.md`, the console's download button and `python -m aeids.reporting`. `/findings` already existed (M3). The README has a five-minute demo. Tests: `tests/test_report_m7.py`.
 
 ## 3. Agent status → task state mapping (proposed)
 

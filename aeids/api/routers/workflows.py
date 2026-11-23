@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Any, Literal
 
-from fastapi import APIRouter, Request, status
+from fastapi import APIRouter, Request, Response, status
 from pydantic import BaseModel, Field
 
 from aeids.api.deps import SessionDep, TenantDep
@@ -13,6 +13,7 @@ from aeids.api.processing import registry, resume_workflow, schedule_workflow
 from aeids.api.schemas import ErrorOut
 from aeids.orchestration import supervisor as sup
 from aeids.orchestration import views
+from aeids.reporting import report as report_doc
 
 router = APIRouter(prefix="/api/v1/workflows", tags=["workflows"])
 
@@ -63,6 +64,23 @@ def tasks(workflow_id: uuid.UUID, session: SessionDep, tenant_id: TenantDep) -> 
 @router.get("/{workflow_id}/findings", responses={404: {"model": ErrorOut}})
 def findings(workflow_id: uuid.UUID, session: SessionDep, tenant_id: TenantDep) -> list[dict[str, Any]]:
     return views.findings(session, views.get_workflow(session, tenant_id, workflow_id))
+
+
+@router.get("/{workflow_id}/report", responses={404: {"model": ErrorOut}, 409: {"model": ErrorOut}})
+def report(workflow_id: uuid.UUID, session: SessionDep, tenant_id: TenantDep) -> dict[str, Any]:
+    """The workflow's checked report (M7): metadata, the content as JSON (schema ``report/1.0``)
+    and where to download it as Markdown. 409 until the workflow completes."""
+    return report_doc.view(report_doc.ensure(session, views.get_workflow(session, tenant_id, workflow_id)))
+
+
+@router.get("/{workflow_id}/report.md", response_class=Response,
+            responses={200: {"content": {"text/markdown": {}}}, 404: {"model": ErrorOut}, 409: {"model": ErrorOut}})
+def report_markdown(workflow_id: uuid.UUID, session: SessionDep, tenant_id: TenantDep) -> Response:
+    """The report as a Markdown file: answer, calculations, limitations, review, numbered sources."""
+    row = report_doc.ensure(session, views.get_workflow(session, tenant_id, workflow_id))
+    name = f"aeids-report-{str(workflow_id)[:8]}-v{row.version}.md"
+    return Response(row.markdown, media_type="text/markdown; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="{name}"', "ETag": f'"{row.sha256}"'})
 
 
 class ReviewIn(BaseModel):

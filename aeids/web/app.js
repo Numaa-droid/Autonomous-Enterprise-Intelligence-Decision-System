@@ -23,6 +23,7 @@ const P = {
   spinner: '<path d="M12 3a9 9 0 1 0 9 9"/>',
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   upload: '<path d="M12 16V4M7 9l5-5 5 5M4 20h16"/>',
+  download: '<path d="M12 4v12M7 11l5 5 5-5M4 20h16"/>',
   lens: '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 9v12"/>',
   chunks: '<rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/>',
   embed: '<circle cx="6" cy="6" r="2"/><circle cx="18" cy="7" r="2"/><circle cx="8" cy="18" r="2"/><circle cx="17" cy="17" r="2"/><path d="M8 7l8 0M7 8l1 8M10 18l5-1M17 9l0 6"/>',
@@ -899,6 +900,10 @@ function drawAnswer(box, wf) {
   if (a.limitations.length) blocks.push(el("div", { class: "answer-note" }, el("b", {}, "Note: "),
     el("ul", {}, a.limitations.map((l) => el("li", {}, l)))));
   blocks.push(el("div", { class: "small muted", style: { marginTop: "12px" } }, a.notice || ""));
+  if (wf.status === "COMPLETED") blocks.push(el("div", { style: { marginTop: "14px" } },
+    el("a", { class: "btn", href: `${API}/workflows/${wf.id}/report.md${tq() ? "?" + tq() : ""}`, download: "" },
+      icon("download"), "Download the report (Markdown)"),
+    el("span", { class: "small muted", style: { marginLeft: "10px" } }, "Answer, calculations, limitations, review and numbered sources, in one file.")));
   box.replaceChildren(card("Answer", null, blocks));
 }
 

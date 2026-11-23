@@ -47,6 +47,7 @@ from aeids.db.models import (
     utcnow,
 )
 from aeids.documents import DocumentError
+from aeids.reporting import report as report_doc
 from aeids.reporting.answer import verified_findings
 from aeids.orchestration.states import TASK_TERMINAL, WORKFLOW_TERMINAL, move_task, move_workflow
 
@@ -559,7 +560,15 @@ def _workflow_state(session: Session, wf: Workflow, settings: Settings) -> None:
             move_workflow(session, wf, W.RUNNING, reason="review resolved")
         move_workflow(session, wf, W.REPORTING, reason="every task is terminal")
         wf.report = build_report(session, wf, tasks)
-        move_workflow(session, wf, W.COMPLETED, reason=f"report built from "
+        session.flush()
+        try:
+            rendered = report_doc.publish(session, wf)
+        except report_doc.ReportCheckFailed as e:  # the report would say more than was verified
+            wf.error = f"report check failed: {e}"[:4000]
+            move_workflow(session, wf, W.FAILED, reason=wf.error)
+            _finish_root_span(session, wf)
+            return
+        move_workflow(session, wf, W.COMPLETED, reason=f"report v{rendered.version} ({rendered.status}) built from "
                       f"{len(wf.report['verified_findings'])} verified finding(s)")
         _finish_root_span(session, wf)
         return

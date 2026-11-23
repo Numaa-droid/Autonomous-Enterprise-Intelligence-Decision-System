@@ -53,6 +53,43 @@ Record each design or library choice in a few lines: what was chosen, what else 
 
 ## Accepted decisions
 
+### D-031 — M7 reports: built from verified findings, checked by code, stored as JSON + Markdown in Postgres
+- Date: 2026-11-23
+- Status: accepted
+- Decision:
+  - **Built:** `aeids/reporting/report.py` builds a `ReportDoc` (schema `report/1.0`) from the workflow's verified findings:
+    - status: complete, partial or nothing verified;
+    - the summary, marked as AI-written or a template;
+    - calculated results, reported figures and cited passages;
+    - each calculation with its typed inputs;
+    - numbered citations (evidence id, file, company, version and whether it is still current, page, section, quote, bbox);
+    - limitations;
+    - review: automatic counts, rework rounds, and each human decision from the audit log;
+    - generation metadata: models, prompt and agent versions, calc versions, tokens, cost, trace id.
+  - **Checked by code against the database before storing:**
+    - every line is a verified finding of the workflow, and every verified finding is in the report;
+    - every line cites a source;
+    - every source is an evidence record of the tenant, with the stated version and page, that supports a finding in the report;
+    - every calculation equals the stored one;
+    - every number in the summary is a checked value.
+  - **What a failure does:** the Supervisor does not store the report and moves the workflow REPORTING → FAILED, with the reasons in `error`. That transition was already legal.
+  - **Rendered:** Markdown (`md-v1`). Text taken from documents is collapsed to one line and has `\ ` * _ [ ] < > |` escaped, so it cannot become a link, image, HTML, emphasis or a table cell (rule 7).
+  - **Stored:** table `reports` (migration 0007): `version` per workflow, content JSON, Markdown, sha256.
+  - **Served:**
+    - `GET /api/v1/workflows/{id}/report` returns metadata and content; 409 until the workflow completes.
+    - `GET .../report.md` returns the file with a sha256 ETag.
+    - The console route `/api/v1/dashboard/workflows/{id}/report.md?tenant=` serves the eval workspace, behind the answer page's download button.
+    - CLI: `python -m aeids.reporting <id> [--tenant] [-o] [--json]`.
+  - **Older workflows:** a workflow completed before M7 gets its report on first request.
+- Alternatives considered:
+  - An LLM-written report: that would add wording and numbers the verifier never saw. The only model text is the D-028 summary, and its numbers are checked again here.
+  - Files in the object store with a `storage_uri`, as ARCHITECTURE §4 sketches: reports are a few KB of text, and keeping them in Postgres keeps them in the same transaction as the workflow's completion.
+  - PDF output: out of scope for Release 0.
+- Why: the Release 0 definition of done says the report contains only verified findings, with citations and limitations. Before M7 this was true by construction but never checked, and there was no report file.
+- Consequences / follow-ups:
+  - Tests in `tests/test_report_m7.py`: complete, partial (a dropped finding), human-reviewed and nothing-verified reports; each check refusing a tampered report; a failed check failing the workflow; versioning and on-request backfill; hostile document text staying inert.
+  - Re-rendering, for example after a cited version is replaced, would add version 2; there is no endpoint for it yet.
+
 ### D-030 — Fewer and smaller model calls: reasoning off, code picks clear cells, skipped calls
 - Date: 2026-11-23
 - Status: accepted

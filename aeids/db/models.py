@@ -476,3 +476,23 @@ class VerificationResult(Base):
     reasons: Mapped[list[str]] = mapped_column(JSONType, default=list)
     rework_instructions: Mapped[str | None] = mapped_column(Text)
     verified_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Report(Base):
+    """A rendered report of a workflow (M7, D-031): the checked content as JSON and as Markdown,
+    built from verified findings only. Reports are small text, so they live here, not in the
+    object store; ``version`` counts re-renders of the same workflow."""
+
+    __tablename__ = "reports"
+    __table_args__ = (UniqueConstraint("workflow_id", "version"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tenants.id"), index=True)
+    workflow_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("workflows.id"), index=True)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    schema_version: Mapped[str] = mapped_column(String(20))
+    status: Mapped[str] = mapped_column(String(20))  # complete | partial | nothing_verified
+    content: Mapped[dict[str, Any]] = mapped_column(JSONType)
+    markdown: Mapped[str] = mapped_column(Text)
+    sha256: Mapped[str] = mapped_column(String(64))  # of the Markdown
+    generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

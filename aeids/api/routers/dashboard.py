@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Annotated, Any, Literal
 
 import httpx
-from fastapi import APIRouter, FastAPI, Query, Request
+from fastapi import APIRouter, FastAPI, Query, Request, Response
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -302,6 +302,19 @@ def console_workflow_detail(workflow_id: uuid.UUID, session: SessionDep, setting
 
     t = _tenant(session, settings, tenant)
     return views.detail(session, views.get_workflow(session, t.id, workflow_id))
+
+
+@router.get("/workflows/{workflow_id}/report.md", response_class=Response)
+def console_report(workflow_id: uuid.UUID, session: SessionDep, settings: SettingsDep,
+                   tenant: TenantName = None) -> Response:
+    """The checked report as Markdown, for the console's tenant selector (M7)."""
+    from aeids.orchestration import views
+    from aeids.reporting import report as report_doc
+
+    t = _tenant(session, settings, tenant)
+    row = report_doc.ensure(session, views.get_workflow(session, t.id, workflow_id))
+    return Response(row.markdown, media_type="text/markdown; charset=utf-8", headers={
+        "Content-Disposition": f'attachment; filename="aeids-report-{str(workflow_id)[:8]}-v{row.version}.md"'})
 
 
 class ConsoleReview(BaseModel):
