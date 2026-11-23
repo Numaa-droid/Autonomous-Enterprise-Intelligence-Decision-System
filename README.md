@@ -525,8 +525,9 @@ Open **http://127.0.0.1:8001/ui** (after `./start.sh`). The colours are a mint p
 **The left panel** (like a chat app) is hidden at first; the panel icon at the top left opens it, and it stays as you left it. On a phone it slides in.
 
 - **+ New question**, and the three pages: **Ask**, **Reports**, **Search**.
-- **Recent questions**, your history: each question once, with a status dot. Click one to reopen its answer; **Show all** lists every question.
-- **Reports**: each company's report with its year and status. Click one to see its versions and processing.
+- **Recent questions** and **Reports** start folded: click a heading to drop its list down, click again to fold it.
+  - **Recent questions**: your 3 latest questions, each once, with a status dot. Click one to reopen its answer.
+  - **Reports**: each company's report with its year and status. Click one to see its versions and processing.
 - **At the bottom:**
   - the **workspace** (`default` for your uploads, `eval` for the benchmark corpus);
   - refresh and the theme switch;

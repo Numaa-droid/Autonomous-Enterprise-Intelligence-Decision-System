@@ -99,7 +99,6 @@ code, pre, .mono { font-family: var(--mono); font-size: 12.5px; }
 .app.side-collapsed { grid-template-columns: minmax(0, 1fr); }
 .app.side-collapsed .sidebar { display: none; }
 .app.side-collapsed .mobilebar { display: flex; align-items: center; gap: 10px; padding: 14px 0 0; }
-.side-more { border: 0; background: none; cursor: pointer; text-align: left; padding: 6px 10px; color: var(--accent-ink); font-weight: 600; font-size: 13px; }
 .new-q { justify-content: center; padding: 10px 14px; border-radius: 12px; font-size: 15px; }
 .new-q:hover { text-decoration: none; }
 .side-nav { display: flex; flex-direction: column; gap: 2px; }
@@ -113,6 +112,17 @@ code, pre, .mono { font-family: var(--mono); font-size: 12.5px; }
 .side-scroll { flex: 1; min-height: 0; overflow-y: auto; margin: 4px -4px 0; padding: 0 4px; display: flex; flex-direction: column; gap: 14px; }
 .side-label { font-size: 11.5px; font-weight: 700; color: var(--muted); text-transform: uppercase;
   letter-spacing: 0.07em; padding: 6px 10px 4px; }
+summary.side-label { display: flex; align-items: center; justify-content: space-between; cursor: pointer;
+  list-style: none; border-radius: 8px; user-select: none; }
+summary.side-label::-webkit-details-marker { display: none; }
+summary.side-label:hover { color: var(--ink); background: var(--surface-3); }
+summary.side-label:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.side-label .chev { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.2;
+  stroke-linecap: round; stroke-linejoin: round; transform: rotate(-90deg); transition: transform 0.15s ease; }
+details[open] > .side-label .chev { transform: none; }
+details.side-section[open] > .side-list { animation: side-drop 0.15s ease; }
+@keyframes side-drop { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .side-label .chev, details.side-section[open] > .side-list { transition: none; animation: none; } }
 .side-list { display: flex; flex-direction: column; gap: 1px; }
 .side-item {
   display: flex; align-items: center; gap: 9px; padding: 7px 10px; border-radius: 9px; color: var(--ink-2);

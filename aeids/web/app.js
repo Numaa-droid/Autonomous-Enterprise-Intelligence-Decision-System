@@ -416,13 +416,10 @@ function drawSidebar() {
   const { page, arg } = route();
   const seen = new Set();
   const latest = rows.filter((w) => { const k = w.query.trim().toLowerCase(); return seen.has(k) ? false : seen.add(k); });
-  const limit = state.sideAll ? 50 : 6;
-  const more = latest.length > 6 ? el("button", { class: "side-more", type: "button",
-    onclick: () => { state.sideAll = !state.sideAll; drawSidebar(); } }, state.sideAll ? "Show fewer" : `Show all ${latest.length}`) : null;
-  $("#side-recent").replaceChildren(...(latest.length ? latest.slice(0, limit).map((w) =>
+  $("#side-recent").replaceChildren(...(latest.length ? latest.slice(0, 3).map((w) =>
     el("a", { class: `side-item${page === "workflows" && arg === String(w.id) ? " active" : ""}`, href: `#/workflows/${w.id}`, title: w.query },
       el("span", { class: `dot ${DOT[w.status] ?? "progress"}` }), el("span", { class: "t" }, w.query)))
-    : [el("div", { class: "side-empty" }, "Your questions will appear here.")]), ...(more ? [more] : []));
+    : [el("div", { class: "side-empty" }, "Your questions will appear here.")]));
   $("#side-reports").replaceChildren(...(docs.length ? docs.map((d) => {
     const v = d.versions.find((x) => x.is_current) || d.versions[d.versions.length - 1];
     const fy = d.fiscal_year ? ` · FY${d.fiscal_year}` : "";
