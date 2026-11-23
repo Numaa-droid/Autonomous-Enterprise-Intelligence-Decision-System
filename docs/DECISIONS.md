@@ -53,6 +53,20 @@ Record each design or library choice in a few lines: what was chosen, what else 
 
 ## Accepted decisions
 
+### D-033 — Earnings per share in the knowledge base (1.1); per-share labels match only per-share line items; an ambiguous-label benchmark question
+- Date: 2026-11-23
+- Status: accepted
+- Decision:
+  - **New line items:** `basic_eps` and `diluted_eps`, under the names the corpus prints ("Diluted net income per share", "Net income per diluted share", "Earnings per share – diluted", Ind AS "… per equity share", …). The bare row labels "Basic" / "Diluted" are not aliases: the share-count rows use them too, so the model picks those cells, seeing the heading. Knowledge base version 1.0 → 1.1.
+  - **Label matching:** in `line_item_for`, a label that names a per-share amount ("per share", "per diluted share", "EPS") matches only a per-share line item, and the reverse. A label containing the word "shares" is a share count, never EPS. A label the code cannot place safely returns no match instead of a wrong one. Before this, "Net income per share: Diluted" resolved to Net income.
+  - **New benchmark question:** c11 asks for Tesla's FY2025 operating margin, whose income line is printed as "Income from operations" (the D-032 defect).
+- Alternatives considered: the bare "Basic" / "Diluted" aliases (they would match share counts); leaving EPS out (the named-line-item safeguard cannot catch a line item the knowledge base lacks).
+- Why: Release 0 review open item 2. l03 (Apple's diluted EPS) was right in only 2 of 3 runs, and no question covered an ambiguous label.
+- Consequences / follow-ups:
+  - Tests in `tests/test_knowledge.py`: per-share labels from all five reports, share-count rows, the named-line-item safeguard.
+  - Benchmark with 37 questions: l03 and c11 passed in 4 of 4 runs.
+  - The same run showed one miss of another kind: c08 (Tesla gross margin), where the analyst model bound revenue to the gross-profit input. The label check refused it, and the report listed "Could not be calculated …" (D-032). Possible follow-up: re-wire a metric's inputs by their line items when the model swaps them.
+
 ### D-032 — Release 0 review fixes: exact template summaries, labels settled by extraction, no silent calculation gaps
 - Date: 2026-11-23
 - Status: accepted

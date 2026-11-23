@@ -37,7 +37,7 @@ def synthetic(key: str) -> dict[str, Quantity]:
 
 
 def test_it_loads_with_financial_and_brsr_metrics() -> None:
-    assert KB.version == "1.0" and len(KB.line_items) >= 45 and len(KB.metrics) >= 35
+    assert KB.version == "1.1" and len(KB.line_items) >= 45 and len(KB.metrics) >= 35
     categories = {m.category for m in KB.metrics.values()}
     assert {"profitability", "returns", "leverage", "brsr_environment", "brsr_social", "csr"} <= categories
     brsr = [m for m in KB.metrics.values() if m.category.startswith("brsr")]
@@ -168,3 +168,42 @@ def test_point_change_takes_percentages_only() -> None:
     assert runs[-1].result.output.value == Decimal("-3.9") and m.display == "percentage_points"
     with pytest.raises(UnitMismatch, match="percent value"):
         coerce(q("5"), None, "percent")
+
+
+# ---------------- earnings per share (Release 0 review, KB 1.1) ----------------
+
+@pytest.mark.parametrize("label, key", [
+    ("Earnings per share: Diluted", "diluted_eps"),               # Apple, Microsoft (heading: row)
+    ("Earnings per share: Basic", "basic_eps"),
+    ("Net income per share: Diluted", "diluted_eps"),             # NVIDIA
+    ("Net income per share: Basic (1)", "basic_eps"),
+    ("Diluted net income per share (Note 12)", "diluted_eps"),    # Alphabet
+    ("Net income per diluted share", "diluted_eps"),
+    ("Diluted earnings per share", "diluted_eps"),
+    ("Basic earnings per equity share", "basic_eps"),             # Ind AS
+    ("Net income", "net_income"),
+    ("Net income attributable to common stockholders", "net_income"),
+])
+def test_per_share_labels_resolve_to_eps_and_only_there(label: str, key: str) -> None:
+    assert KB.line_item_for(label)[0] == key
+
+
+@pytest.mark.parametrize("label", [
+    "Shares used in computing earnings per share: Diluted",       # a share count, not EPS
+    "Weighted-average shares outstanding: Diluted",
+    "Net income per share of common stock attributable to common stockholders: Diluted",  # no safe match
+])
+def test_share_counts_and_unknown_per_share_labels_are_never_guessed(label: str) -> None:
+    assert KB.line_item_for(label) is None
+
+
+def test_a_question_naming_eps_is_searched_even_if_the_planner_drops_it() -> None:
+    from aeids.agents.document_intelligence.resolver import CellResolver
+
+    r = CellResolver(KB)
+    assert r.named_in("What were Apple's diluted earnings per share for fiscal 2025?") == ["Diluted earnings per share"]
+    assert r.named_in("Microsoft basic EPS in fiscal 2025") == ["Basic earnings per share"]
+    assert r.named_in("How many diluted shares did Apple have?") == []
+    from aeids.knowledge import planning_catalog
+
+    assert "Diluted earnings per share" in planning_catalog(KB, "What was NVIDIA's diluted EPS?")

@@ -218,7 +218,7 @@ def test_done_when_revenue_and_operating_margin(env: Env, session: Session) -> N
     assert len(report["verified_findings"]) == 11 and not report["limitations"]
     assert sum(1 for f in report["verified_findings"] if f["calculation"]) == 5
     runs = session.scalars(select(AgentRun).where(AgentRun.agent_name.in_(["document_intelligence", "financial_analyst"]))).all()
-    assert {r.prompt_version for r in runs} == {"di-v2+kb-1.0", "fa-v2+kb-1.0"}
+    assert {r.prompt_version for r in runs} == {"di-v2+kb-1.1", "fa-v2+kb-1.1"}
     assert all(r.model == "fake/model" and r.total_tokens and r.cost_usd for r in runs)
     assert session.scalar(select(CalculationRecord).where(CalculationRecord.id.isnot(None))) is not None
 
@@ -430,7 +430,7 @@ def test_knowledge_base_metrics_with_steps(env: Env, session: Session) -> None:
     assert "pct_change" in calc_findings and "margin" in calc_findings
     assert all(f["verification_status"] == "verified" for f in wf["findings"])
     out = wf["tasks_by_key"]["analyse"]["output"]
-    assert out["kb_metrics"] == ["roe", "operating_margin", "yoy_growth"] and out["kb_version"] == "1.0"
+    assert out["kb_metrics"] == ["roe", "operating_margin", "yoy_growth"] and out["kb_version"] == "1.1"
     # the prompts carried the knowledge base
     plan_user = next(u for s, u in env.llm.prompts if "understand the user's question" in s)
     extract_user = next(u for s, u in env.llm.prompts if "point at the cells" in s)

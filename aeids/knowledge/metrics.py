@@ -117,10 +117,13 @@ class KnowledgeBase(_Strict):
     def line_item_for(self, text: str) -> tuple[str, LineItem] | None:
         """The line item whose name or an alias matches a printed label or metric name."""
         t = _norm(text)
+        per_share = bool(_PER_SHARE.search(t)) and not _SHARES.search(t)  # "Shares used in ... per share" counts shares
         best: tuple[int, int, str] | None = None  # (exact?, matched length, key): longest match wins
         for key, item in self.line_items.items():
             if item.reported_ratio_of:
                 continue
+            if per_share != any(_PER_SHARE.search(_norm(n)) for n in item.names()):
+                continue  # "Net income per share: Diluted" is never Net income, and the reverse
             for n in item.names():
                 a = _norm(n)
                 if len(a) < 4:
@@ -141,6 +144,10 @@ class KnowledgeBase(_Strict):
                 if len(a) >= 6 and (a == t or f" {a} " in f" {t} ") and (best is None or len(a) > best[0]):
                     best = (len(a), key)
         return (best[1], self.metrics[best[1]]) if best else None
+
+
+_PER_SHARE = re.compile(r"\bper (diluted |basic |equity |common )?share\b|\beps\b")
+_SHARES = re.compile(r"\bshares\b")
 
 
 def _norm(s: str) -> str:

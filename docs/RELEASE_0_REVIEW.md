@@ -97,6 +97,9 @@ None of these blocks Release 0. Items 1 and 2 should be closed before Release 1 
    - l03 (Apple's diluted earnings per share) was right in 2 of 3 runs. Earnings per share is not in the knowledge base, so when the planning model drops it, nothing searches for it.
    - Fix: add basic and diluted EPS to the knowledge base. Their rows are usually labelled just "Basic" / "Diluted", which is also the label of the share-count rows, so the model would pick the cell rather than code. Then rerun the benchmark.
    - Until that is done, report AEIDS accuracy as **89–92%**, not 92%.
+   - **Update, same day (D-033):**
+     - Done: basic and diluted EPS added to the knowledge base (1.1); question c11 (Tesla operating margin) added, making 37 questions. l03 and c11 passed in 4 of 4 runs.
+     - The next full run showed one miss of another kind: c08 (Tesla gross margin), where the analyst model wired revenue into the gross-profit input. The label check refused it, and the report listed it as not calculated.
 3. **Values printed only in prose are not extracted.** For example, employee headcounts. These are the 3 questions AEIDS gets wrong, and it answers them with quoted passages rather than a number.
 4. **Values read from charts need a person.** By design (D-027); the review queue handles them.
 5. **Crash recovery waits for the lease.** A crashed task resumes only after `AEIDS_TASK_TIMEOUT_SECONDS` (180 s by default), and the length is fixed when the task is planned. That is acceptable for Release 0; a heartbeat would shorten it.

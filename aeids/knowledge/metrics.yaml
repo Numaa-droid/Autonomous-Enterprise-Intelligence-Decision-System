@@ -16,7 +16,7 @@
 #   (same: all for one fiscal year; later/earlier: two fiscal years in order).
 # Bump "version" whenever a definition changes; it is recorded with every agent run.
 
-version: "1.0"
+version: "1.1"
 
 line_items:
   # ---------------- income statement ----------------
@@ -100,6 +100,27 @@ line_items:
     statement: income_statement
     unit: currency
     notes: For returns on equity prefer the profit attributable to the owners of the parent.
+  basic_eps:
+    name: Basic earnings per share
+    aliases: [Basic EPS, Basic net income per share, Net income per basic share, Basic earnings per equity share,
+              Earnings per share - basic, Net income per share - basic, Basic earnings per share]
+    statement: income_statement
+    unit: currency
+    notes: >-
+      Per share, in currency units (not millions). Statements often print the row as just "Basic"
+      under an "Earnings per share" or "Net income per share" heading; the share-count rows below
+      use the same word, so check the heading. Ind AS: "Earnings per equity share".
+  diluted_eps:
+    name: Diluted earnings per share
+    aliases: [Diluted EPS, Diluted net income per share, Net income per diluted share,
+              Diluted earnings per equity share, Earnings per share - diluted, Net income per share - diluted,
+              Diluted earnings per share]
+    statement: income_statement
+    unit: currency
+    notes: >-
+      Per share, in currency units (not millions). Statements often print the row as just "Diluted"
+      under an "Earnings per share" or "Net income per share" heading; the share-count rows below
+      use the same word, so check the heading. Ind AS: "Earnings per equity share".
 
   # ---------------- balance sheet ----------------
   total_assets:

@@ -73,7 +73,7 @@ Build vertically: get one question flowing end to end before polishing any singl
 - Run both systems on `eval/questions.jsonl`
 - Report: answer accuracy, citation correctness, unsupported-claim rate, latency, tokens/cost per question
 - **Done when:** one command produces a comparison table.
-- **Status:** done (D-029; speed and token work D-030). `.venv/bin/python eval/run_benchmark.py` on 36 questions: AEIDS 89–92% (three runs) vs baseline 69% correct, 0% vs 12% unsupported numbers, median 4.6 s vs 2.0 s, USD 0.0004 vs 0.0002 per question; `tests/test_baseline_m6.py`, `tests/test_speed_d030.py`.
+- **Status:** done (D-029; speed and token work D-030). `.venv/bin/python eval/run_benchmark.py` on 37 questions (36 at first; c11 added in D-033): AEIDS 89–92% (several runs) vs baseline 69% correct, 0% vs 12% unsupported numbers, median 4.6 s vs 2.0 s, USD 0.0004 vs 0.0002 per question; `tests/test_baseline_m6.py`, `tests/test_speed_d030.py`.
 
 ### M7 — Report and polish
 - Report generator using only `verified` findings; includes citations, limitations, review status
