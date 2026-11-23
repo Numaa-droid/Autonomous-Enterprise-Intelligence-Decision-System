@@ -9,7 +9,7 @@ const state = { tenant: null, defaultTenant: "default", tenants: [], timer: null
 
 /* ---------------- icons (constant markup only) ---------------- */
 const P = {
-  overview: '<path d="M3 13h8V3H3zM13 21h8V11h-8zM3 21h8v-6H3zM13 3v6h8V3z"/>',
+  overview: '<path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10"/><path d="M10 20v-5.5h4V20"/>',
   documents: '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/>',
   search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
   evaluation: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
@@ -122,19 +122,19 @@ const pct = (v) => v == null ? "–" : `${Math.round(v * 100)}%`;
 
 /* ---------------- colour roles ---------------- */
 const KIND = {
-  retrieval: ["--s1", "Retrieval"], embedding: ["--s2", "Embedding"], vectordb: ["--s3", "Vector DB"],
-  tool: ["--s4", "TableLens"], llm: ["--s5", "LLM"], index: ["--s6", "Indexing"], job: ["--s7", "Job"],
-  parser: ["--neutral", "Parsing"], eval: ["--neutral", "Evaluation"], chain: ["--neutral", "Step"],
+  retrieval: ["--s1", "Search"], embedding: ["--s2", "AI embedding"], vectordb: ["--s3", "Search index"],
+  tool: ["--s4", "PDF reader"], llm: ["--s5", "AI model"], index: ["--s6", "Indexing"], job: ["--s7", "Background job"],
+  parser: ["--neutral", "Reading PDF"], eval: ["--neutral", "Quality test"], chain: ["--neutral", "Step"],
 };
 const kindVar = (k) => `var(${(KIND[k] || KIND.chain)[0]})`;
 const kindLabel = (k) => (KIND[k] || [null, k])[1];
 const kindBadge = (k) => el("span", { class: "badge kind", vars: { "--c": kindVar(k) } }, kindLabel(k));
 const STATUS = {
-  pending: ["muted", "clock", "Pending", "var(--neutral)"],
-  parsing: ["progress", "spinner", "Parsing", "var(--s1)"],
-  parsed: ["muted", "check", "Parsed", "var(--s3)"],
-  indexing: ["progress", "spinner", "Indexing", "var(--s7)"],
-  indexed: ["good", "check", "Indexed", "var(--good)"],
+  pending: ["muted", "clock", "Waiting", "var(--neutral)"],
+  parsing: ["progress", "spinner", "Reading", "var(--s1)"],
+  parsed: ["muted", "check", "Read", "var(--s3)"],
+  indexing: ["progress", "spinner", "Making searchable", "var(--s7)"],
+  indexed: ["good", "check", "Ready", "var(--good)"],
   failed: ["critical", "x", "Failed", "var(--critical)"],
 };
 function statusTag(status) {
@@ -301,17 +301,19 @@ function donut(items, { size = 150, thickness = 22, centre, centreSub }) {
 
 /* ---------------- navigation ---------------- */
 const PAGES = [
-  ["overview", "Overview", "Pipeline, activity and service health"],
-  ["documents", "Documents", "Every report and the processing state of each version"],
-  ["workflows", "Questions", "Ask about the reports; every number is checked before you see it"],
-  ["search", "Search", "Ask a question; see what retrieval returns and why"],
-  ["evaluation", "Evaluation", "Retrieval benchmark on the 5-company corpus"],
-  ["traces", "Traces", "Every run, step by step: timing, tokens, cost, inputs and outputs"],
-  ["logs", "Logs", "Live output of TableLens, the API and the worker"],
+  ["overview", "Home", "What AEIDS does and how to start", "main"],
+  ["workflows", "Ask a question", "Ask about the reports; every number is checked before you see it", "main"],
+  ["documents", "Reports", "Upload company reports and see when each one is ready", "main"],
+  ["search", "Search", "Find the passages in the reports that mention something", "main"],
+  ["evaluation", "Search quality", "How often search finds the right page, on a fixed set of test questions", "tech"],
+  ["traces", "Run history", "Every run, step by step: time taken, AI usage and cost", "tech"],
+  ["logs", "System logs", "Raw output of the background services", "tech"],
 ];
 function buildNav() {
-  $("#nav").replaceChildren(...PAGES.map(([id, label]) =>
-    el("a", { href: `#/${id}`, "data-page": id }, icon(id), label)));
+  const firstTech = PAGES.findIndex((p) => p[3] === "tech");
+  $("#nav").replaceChildren(...PAGES.flatMap(([id, label], i) => [
+    i === firstTech ? el("div", { class: "nav-label" }, "For engineers") : null,
+    el("a", { href: `#/${id}`, "data-page": id }, icon(id), label)].filter(Boolean)));
 }
 function route() {
   const [page = "overview", arg] = location.hash.replace(/^#\/?/, "").split("/");
@@ -322,8 +324,8 @@ async function render(soft = false) {
   const { page, arg } = route();
   const meta = PAGES.find(([id]) => id === page);
   document.querySelectorAll("#nav a").forEach((a) => a.classList.toggle("active", a.dataset.page === page));
-  $("#page-title").textContent = arg && page === "traces" ? "Trace" : arg && page === "workflows" ? "Question" : meta[1];
-  $("#page-crumb").textContent = arg ? (page === "traces" ? `Trace ${arg.slice(0, 12)}…` : "The answer, and how it was checked") : meta[2];
+  $("#page-title").textContent = arg && page === "traces" ? "Run details" : arg && page === "workflows" ? "Your question" : meta[1];
+  $("#page-crumb").textContent = arg ? (page === "traces" ? `Run ${arg.slice(0, 12)}…` : "The answer, and how it was checked") : meta[2];
   if (soft && state.current?.refresh) { try { await state.current.refresh(); } catch (e) { /* keep page */ } return; }
   // quick clicks (page, tenant, theme) can start several renders: only the newest may touch the page
   const seq = (state.renderSeq = (state.renderSeq || 0) + 1);
@@ -347,45 +349,79 @@ async function render(soft = false) {
 
 /* ---------------- overview ---------------- */
 async function viewOverview(root) {
-  const [ov, sv] = await Promise.all([api(`/overview?${tq()}`), api("/services").catch(() => ({}))]);
+  const [ov, sv, asked] = await Promise.all([api(`/overview?${tq()}`), api("/services").catch(() => ({})),
+    api(`/workflows?${tq()}`).catch(() => [])]);
   const d = ov.documents, t = ov.totals_7d;
   state.models = ov.models;
-  $("#model-chip").replaceChildren(el("b", {}, "Models"), `Embeddings: ${ov.models.embedding}`, el("br"), `LLM: ${ov.models.llm}`);
+  $("#model-chip").replaceChildren(el("b", {}, "AI models"), `Search: ${ov.models.embedding}`, el("br"), `Answers: ${ov.models.llm}`);
 
-  const svcNames = { database: "Postgres", qdrant: "Qdrant", redis: "Redis", tablelens: "TableLens", openrouter: "OpenRouter" };
+  // plain health line: one sentence for everyone; the per-service pills sit in the technical section
+  const svcNames = { database: "Database", qdrant: "Search index", redis: "Job queue", tablelens: "PDF reader", openrouter: "AI models" };
+  const techNames = { database: "Postgres", qdrant: "Qdrant", redis: "Redis", tablelens: "TableLens", openrouter: "OpenRouter" };
+  const down = Object.keys(svcNames).filter((k) => sv[k] && !sv[k].ok);
+  const known = Object.keys(svcNames).some((k) => sv[k]);
+  const health = !known ? null : down.length
+    ? el("div", { class: "health critical", role: "status" }, icon("x"),
+      `Not everything is running: ${down.map((k) => svcNames[k]).join(", ")}. Ask an engineer to run ./start.sh.`)
+    : el("div", { class: "health good", role: "status" }, icon("check"), "Everything is running");
   const hero = el("div", { class: "card hero fade-in" },
-    el("h2", {}, `${fmtInt(d.documents)} reports · ${fmtInt(d.chunks)} searchable chunks · ${fmtInt(t.traces)} runs this week`),
-    el("p", {}, "Every upload is parsed by TableLens, normalised into section-aware chunks, embedded with ",
-      el("b", {}, ov.models.embedding), " and indexed in Qdrant. Search fuses meaning and exact words, and every step is traced."),
-    el("div", { class: "services" }, Object.entries(svcNames).map(([k, name]) => {
-      const s = sv[k];
-      if (!s) return null;
-      return el("span", { class: `pill ${s.ok ? "good" : "critical"}`, title: s.detail },
-        icon(s.ok ? "check" : "x"), el("b", {}, name), s.ok ? s.detail : `down (${s.detail})`);
-    })));
+    el("h2", {}, "Welcome to AEIDS"),
+    el("p", {}, "Upload company reports, ask a question in plain English, and get an answer in which every number is ",
+      "checked against the page it came from. AEIDS supports decisions; it does not replace a financial, legal or compliance review."),
+    health);
 
-  const kpi = (ic, label, value, foot, glow) => el("div", { class: "card kpi fade-in", vars: { "--kpi-glow": glow } },
+  const ready = d.by_status.indexed || 0;
+  const step = (n, title, text, href, label) => el("div", { class: "how-step" },
+    el("div", { class: "num" }, String(n)), el("h3", {}, title), el("p", {}, text),
+    href ? el("a", { class: n === 2 ? "btn primary" : "btn", href }, label) : null);
+  const how = card("How it works", null, el("div", { class: "how-steps" },
+    step(1, "Upload the reports", "Add annual or ESG reports as PDF files. AEIDS reads the text and the tables; this takes a few minutes per report.",
+      "#/documents", d.documents ? "See the reports" : "Upload a report"),
+    step(2, "Ask a question", "For example: “What was Apple's operating margin in 2025?” or “Compare revenue growth of Microsoft and Nvidia.”",
+      "#/workflows", "Ask a question"),
+    step(3, "Read the checked answer", "Each number shows the report and page it came from, and any sums are done by a calculator, not by the AI. Anything that could not be checked is left out, and the answer says so.",
+      null, null)));
+
+  const kpi = (ic, label, value, foot) => el("div", { class: "card kpi fade-in" },
     el("div", { class: "label" }, icon(ic), label), el("div", { class: "value tnum" }, value), el("div", { class: "foot" }, foot));
+  const failedCount = d.by_status.failed || 0;
+  const simple = el("div", { class: "grid g-kpi", style: { gridTemplateColumns: "repeat(4, minmax(0, 1fr))" } },
+    kpi("documents", "Reports", fmtInt(d.documents), `from ${fmtInt(d.companies)} ${d.companies === 1 ? "company" : "companies"}`),
+    kpi("check", "Ready to use", fmtInt(ready), d.versions ? `of ${fmtInt(d.versions)} uploaded file${d.versions === 1 ? "" : "s"}` : "nothing uploaded yet"),
+    kpi("workflows", "Questions asked", fmtInt(asked.length), asked.length ? `last one ${relTime(asked[0].created_at)}` : "none yet"),
+    kpi("alert", "Need attention", fmtInt(failedCount), failedCount ? "could not be read; see Reports" : "nothing to fix"));
+
+  const failures = d.failures?.length ? card("Reports that could not be read", "newest first",
+    d.failures.map((f) => el("div", { class: "error-box" }, el("b", {}, f.file), el("div", {}, f.error || "failed"),
+      el("div", { class: "muted small" }, fmtDate(f.at))))) : null;
+
+  // ---- technical details (folded): the engineer's view of the same tenant ----
+  const pills = el("div", { class: "services" }, Object.entries(techNames).map(([k, name]) => {
+    const s = sv[k];
+    if (!s) return null;
+    return el("span", { class: `pill ${s.ok ? "good" : "critical"}`, title: s.detail },
+      icon(s.ok ? "check" : "x"), el("b", {}, name), s.ok ? s.detail : `down (${s.detail})`);
+  }));
   const kinds = d.chunk_kinds || {};
   const kpis = el("div", { class: "grid g-kpi" },
-    kpi("documents", "Reports", fmtInt(d.documents), `${fmtInt(d.companies)} companies · ${fmtInt(d.versions)} versions`, "rgba(198,244,50,.13)"),
-    kpi("chunks", "Searchable chunks", fmtInt(d.chunks), `${fmtInt(kinds.table || 0)} tables · ${fmtInt(kinds.chart || 0)} charts`, "rgba(198,244,50,.13)"),
-    kpi("traces", "Runs (7 days)", fmtInt(t.traces), `${fmtInt(t.spans)} steps · ${fmtInt(t.errors)} failed`, "rgba(198,244,50,.13)"),
-    kpi("sparkle", "Model calls (7 days)", fmtInt(t.llm_calls + t.embedding_calls), `${fmtInt(t.tokens)} tokens`, "rgba(198,244,50,.13)"),
-    kpi("coin", "Spend (7 days)", fmtCost(t.cost_usd), "OpenRouter, as reported", "rgba(198,244,50,.13)"));
+    kpi("chunks", "Searchable chunks", fmtInt(d.chunks), `${fmtInt(kinds.table || 0)} tables · ${fmtInt(kinds.chart || 0)} charts`),
+    kpi("traces", "Runs (7 days)", fmtInt(t.traces), `${fmtInt(t.spans)} steps · ${fmtInt(t.errors)} failed`),
+    kpi("sparkle", "Model calls (7 days)", fmtInt(t.llm_calls + t.embedding_calls), `${fmtInt(t.tokens)} tokens`),
+    kpi("coin", "Spend (7 days)", fmtCost(t.cost_usd), "OpenRouter, as reported"),
+    kpi("database", "Indexed vectors", fmtInt(d.indexed_points), `${fmtInt(d.versions)} versions`));
 
   const parsed = (d.by_status.parsed || 0) + (d.by_status.indexing || 0) + (d.by_status.indexed || 0);
   const stages = [
-    ["upload", "Upload", "PDF stored, checksum dedupe", fmtInt(d.versions), "var(--accent)"],
-    ["lens", "TableLens", "Layout + fine-tuned table model", fmtInt(parsed), "var(--accent)"],
-    ["chunks", "Normalise & chunk", "Units, scale, periods; sections", fmtInt(d.chunks), "var(--accent)"],
-    ["embed", "Embed", (ov.models.embedding || "").split("/").pop(), fmtInt(t.embedding_calls) + " calls", "var(--accent)"],
-    ["database", "Qdrant index", "Verified, then made current", fmtInt(d.indexed_points), "var(--accent)"],
-    ["search", "Hybrid search", "Meaning + words, RRF", fmtInt(t.searches || 0) + " / 7d", "var(--accent)"],
+    ["upload", "Upload", "PDF stored, checksum dedupe", fmtInt(d.versions)],
+    ["lens", "TableLens", "Layout + fine-tuned table model", fmtInt(parsed)],
+    ["chunks", "Normalise & chunk", "Units, scale, periods; sections", fmtInt(d.chunks)],
+    ["embed", "Embed", (ov.models.embedding || "").split("/").pop(), fmtInt(t.embedding_calls) + " calls"],
+    ["database", "Qdrant index", "Verified, then made current", fmtInt(d.indexed_points)],
+    ["search", "Hybrid search", "Meaning + words, RRF", fmtInt(t.searches || 0) + " / 7d"],
   ];
-  const pipeline = card("Ingestion pipeline", "documents flow left to right; counts for this tenant",
-    el("div", { class: "pipeline" }, stages.map(([ic, name, what, count, c]) =>
-      el("div", { class: "stage", vars: { "--c": c } },
+  const pipeline = card("Ingestion pipeline", "documents flow left to right; counts for this workspace",
+    el("div", { class: "pipeline" }, stages.map(([ic, name, what, count]) =>
+      el("div", { class: "stage", vars: { "--c": "var(--accent)" } },
         el("div", { class: "orb" }, icon(ic)), el("div", { class: "name" }, name),
         el("div", { class: "what" }, what), el("div", { class: "count tnum" }, count)))));
 
@@ -414,7 +450,7 @@ async function viewOverview(root) {
     actBox);
 
   const maxP95 = Math.max(1, ...ov.latency.map((l) => l.p95));
-  const latency = card("Latency by step", "median bar, 95th percentile tick",
+  const latency = card("Time per step", "median bar, 95th percentile tick",
     ov.latency.length ? ov.latency.map((l) => hover(el("div", { class: "latency-row" },
       el("span", {}, kindBadge(l.kind)),
       el("div", { class: "track" }, el("div", { class: "bar", style: { width: `${(l.p50 / maxP95) * 100}%` } }),
@@ -424,11 +460,11 @@ async function viewOverview(root) {
       : empty("clock", "No runs yet", "Process a document or run a search."));
 
   const statusItems = Object.entries(STATUS).map(([k, [, ic, label, color]]) => ({ key: k, label, value: d.by_status[k] || 0, color, ic }));
-  const chunkKinds = [["text", "Text", "var(--series-lime)"], ["table", "Tables", "var(--s1)"], ["chart", "Charts", "var(--s5)"]];
+  const chunkKinds = [["text", "Text", "var(--series-brand)"], ["table", "Tables", "var(--s1)"], ["chart", "Charts", "var(--s5)"]];
   const kindsTotal = Math.max(1, d.chunks);
-  const status = card("Versions by state", null,
+  const status = card("Files by state", null,
     el("div", { class: "donut-wrap" },
-      donut(statusItems, { centre: fmtInt(d.versions), centreSub: "versions" }),
+      donut(statusItems, { centre: fmtInt(d.versions), centreSub: "files" }),
       el("div", { class: "legend" }, statusItems.filter((s) => s.value || ["indexed", "failed"].includes(s.key)).map((s) =>
         el("span", {}, el("i", { style: { background: s.color } }), statusTag(s.key), el("span", { class: "muted tnum" }, ` ${fmtInt(s.value)}`))))),
     el("div", { style: { marginTop: "18px" } },
@@ -439,24 +475,28 @@ async function viewOverview(root) {
         el("span", {}, el("i", { style: { background: c } }), `${label} ${fmtInt(kinds[k] || 0)}`)))));
 
   const recent = card("Recent runs", null, traceTable(ov.recent_traces, true));
-  const failures = d.failures?.length ? card("Failed versions", "newest first",
-    d.failures.map((f) => el("div", { class: "error-box" }, el("b", {}, f.file), el("div", {}, f.error || "failed"),
-      el("div", { class: "muted small" }, fmtDate(f.at))))) : null;
 
-  append(root, [hero, kpis, pipeline, el("div", { class: "grid g-3" }, activity, latency, status),
-    el("div", { class: failures ? "grid g-21" : "grid" }, recent, failures)]);
+  let opened = false;
+  try { opened = localStorage.getItem("aeids.techOpen") === "1"; } catch (e) { /* storage unavailable */ }
+  const tech = el("details", { class: "card how", ...(opened ? { open: true } : {}),
+    ontoggle: (e) => { try { localStorage.setItem("aeids.techOpen", e.target.open ? "1" : "0"); } catch (err) { /* ignore */ } } },
+    el("summary", {}, el("b", {}, "Technical details"), el("span", { class: "muted small" }, " · services, pipeline, activity, speed and cost (for engineers)")),
+    el("div", { class: "grid", style: { gap: "20px" } }, pills, kpis, pipeline,
+      el("div", { class: "grid g-3" }, activity, latency, status), recent));
+
+  append(root, [hero, how, simple, failures, tech]);
   drawActivity();
 }
 
 /* ---------------- documents ---------------- */
 const IN_PROGRESS = ["pending", "parsing", "indexing"];
 const PROCESSING_NOTE = {
-  queued: ["info", "Uploaded. The worker will parse it with TableLens, then index it for search. This page updates by itself."],
-  already_queued: ["info", "Uploaded. It is already waiting in the processing queue."],
-  done: ["good", "Uploaded, parsed and indexed. It is searchable now."],
-  failed: ["critical", "Uploaded, but processing failed. The reason is shown on the version below; use Process again to retry."],
-  not_queued: ["warning", "Uploaded, but the job queue (Redis) is not reachable, so processing has not started. Start everything with ./start.sh, then press Process again."],
-  off: ["warning", "Uploaded. Automatic processing is off (AEIDS_JOBS_MODE=off); press Process again to start it."],
+  queued: ["info", "Uploaded. AEIDS is now reading it (text and tables) and making it searchable. This usually takes a few minutes; this page updates by itself."],
+  already_queued: ["info", "Uploaded. It is already waiting its turn to be read."],
+  done: ["good", "Uploaded and ready. You can ask questions about it now."],
+  failed: ["critical", "Uploaded, but AEIDS could not read it. The reason is shown below; press Try again."],
+  not_queued: ["warning", "Uploaded, but the background service that reads reports is not running, so nothing has started. Ask an engineer to run ./start.sh, then press Try again."],
+  off: ["warning", "Uploaded. Automatic reading is turned off (AEIDS_JOBS_MODE=off); press Try again to start it."],
 };
 function notice(kind, ...text) {
   const ic = { good: "check", critical: "x", warning: "alert", info: "clock" }[kind] || "clock";
@@ -480,7 +520,7 @@ function uploadWithProgress(url, form, onProgress) {
 function uploadOutcome(out) {
   if (out.duplicate) {
     return notice("info", el("b", {}, "Already stored. "),
-      `This exact file is version ${out.version.version_number} of ${out.document.company_name}'s ${out.document.filename}. Nothing new was created.`);
+      `This exact file is already uploaded (version ${out.version.version_number} of ${out.document.company_name}'s ${out.document.filename}). Nothing new was added.`);
   }
   const [kind, text] = PROCESSING_NOTE[out.processing] || ["info", `Uploaded (${out.processing}).`];
   return notice(kind, el("b", {}, `${out.version.filename} · version ${out.version.version_number}. `), text);
@@ -509,8 +549,8 @@ function uploadPanel(companies, onUploaded) {
   const type = el("select", { class: "select", "aria-label": "Document type" },
     [["annual_report", "Annual report"], ["esg_report", "ESG report"], ["brsr", "BRSR"], ["other", "Other"]]
       .map(([v, l]) => el("option", { value: v }, l)));
-  const year = el("input", { class: "input", type: "number", min: "1900", max: "2100", placeholder: "e.g. 2025", "aria-label": "Fiscal year", style: { width: "120px" } });
-  const submit = el("button", { class: "btn primary", type: "submit", disabled: true }, icon("upload"), "Upload & process");
+  const year = el("input", { class: "input", type: "number", min: "1900", max: "2100", placeholder: "e.g. 2025", "aria-label": "Year", style: { width: "120px" } });
+  const submit = el("button", { class: "btn primary", type: "submit", disabled: true }, icon("upload"), "Upload");
   const progress = progressBar();
   const result = el("div");
 
@@ -546,7 +586,7 @@ function uploadPanel(companies, onUploaded) {
     result.replaceChildren();
     try {
       const out = await uploadWithProgress("/api/v1/documents", data, (f) =>
-        f < 1 ? progress.set(f, `Uploading ${Math.round(f * 100)}%`) : progress.busy("Stored; starting processing…"));
+        f < 1 ? progress.set(f, `Uploading ${Math.round(f * 100)}%`) : progress.busy("Saved; starting to read it…"));
       progress.hide();
       result.replaceChildren(uploadOutcome(out));
       file = null; fileInput.value = "";
@@ -562,15 +602,15 @@ function uploadPanel(companies, onUploaded) {
     el("div", { class: "upload-fields" },
       el("label", { class: "field grow" }, el("span", {}, "Company"), company, datalist),
       el("label", { class: "field" }, el("span", {}, "Document type"), type),
-      el("label", { class: "field" }, el("span", {}, "Fiscal year"), year),
+      el("label", { class: "field" }, el("span", {}, "Year (optional)"), year),
       el("div", { class: "field end" }, submit)),
     progress.box, result);
 
   const other = state.tenant && state.tenant !== state.defaultTenant;
   return el("div", { class: "card hero fade-in" },
     el("div", { class: "row" }, el("h2", { style: { margin: 0 } }, "Upload a report"),
-      el("span", { class: "small muted" }, "PDF · parsed by TableLens, normalised, chunked and indexed for search")),
-    other ? notice("info", `You are viewing the "${state.tenant}" tenant. Uploads go to your own documents ("${state.defaultTenant}"); the page switches there after uploading.`) : null,
+      el("span", { class: "small muted" }, "A PDF annual or ESG report. AEIDS reads its text and tables and makes it searchable.")),
+    other ? notice("info", `You are looking at the "${state.tenant}" workspace. Uploads go to your own workspace ("${state.defaultTenant}"); the page switches there after uploading.`) : null,
     form);
 }
 
@@ -586,7 +626,7 @@ function versionUploadButton(doc, onUploaded) {
     result.replaceChildren();
     try {
       const out = await uploadWithProgress(`/api/v1/documents/${encodeURIComponent(doc.id)}/versions`, data, (fr) =>
-        fr < 1 ? progress.set(fr, `Uploading ${f.name} ${Math.round(fr * 100)}%`) : progress.busy("Stored; starting processing…"));
+        fr < 1 ? progress.set(fr, `Uploading ${f.name} ${Math.round(fr * 100)}%`) : progress.busy("Saved; starting to read it…"));
       progress.hide();
       result.replaceChildren(uploadOutcome(out));
       await onUploaded(out);
@@ -595,8 +635,8 @@ function versionUploadButton(doc, onUploaded) {
       result.replaceChildren(notice("critical", el("b", {}, "Upload failed. "), err.message));
     } finally { input.value = ""; }
   });
-  const button = el("button", { class: "btn", type: "button", title: "The current version stays current until the new one is indexed",
-    onclick: () => input.click() }, icon("upload"), "Upload new version");
+  const button = el("button", { class: "btn", type: "button", title: "The old version stays in use until the new one is ready",
+    onclick: () => input.click() }, icon("upload"), "Upload a newer version");
   return { button, input, below: el("div", {}, progress.box, result) };
 }
 
@@ -641,15 +681,15 @@ async function viewDocuments(root) {
   };
   const drawList = () => {
     if (!docs.length) {
-      list.replaceChildren(card(null, null, empty("documents", "No documents yet", "Upload a PDF above; it appears here and moves through the pipeline.")));
+      list.replaceChildren(card(null, null, empty("documents", "No reports yet", "Upload a PDF above. It shows up here, and you can follow it until it is ready.")));
       return;
     }
     const companies = [...new Set(docs.map((d) => d.company))];
     const order = ["pending", "parsing", "parsed", "indexing", "indexed"];
-    const labels = ["Uploaded", "Parsing", "Parsed", "Indexing", "Indexed & current"];
+    const labels = ["Uploaded", "Reading the PDF", "Read", "Making it searchable", "Ready to use"];
     const own = state.tenant === state.defaultTenant;
     list.replaceChildren(...docs.map((doc) => {
-      const c = "var(--accent)"; // brand lime avatar with dark initials
+      const c = "var(--accent)"; // brand teal avatar
       const words = doc.company.replace(/[^A-Za-z ]/g, " ").split(/\s+/)
         .filter((w) => w && !/^(inc|corp|corporation|co|ltd|limited|plc|llc|the)$/i.test(w));
       const initials = (words.length > 1 ? words[0][0] + words[1][0] : (words[0] || "?").slice(0, 2)).toUpperCase();
@@ -667,11 +707,11 @@ async function viewDocuments(root) {
           if (!retryNotes.has(v.id)) retryNotes.set(v.id, el("div"));
           const actionOut = retryNotes.get(v.id);
           const retry = v.status === "failed" && own
-            ? el("button", { class: "btn", type: "button", onclick: (e) => processAgain(doc, v, e.currentTarget, actionOut).then(load) }, icon("refresh"), "Process again")
+            ? el("button", { class: "btn", type: "button", onclick: (e) => processAgain(doc, v, e.currentTarget, actionOut).then(load) }, icon("refresh"), "Try again")
             : null;
           return el("div", { class: "version" },
             el("div", { class: "version-top" }, el("b", {}, `Version ${v.version_number}`),
-              v.is_current ? el("span", { class: "badge current" }, icon("check"), "Current") : null,
+              v.is_current ? el("span", { class: "badge current", title: "Questions and search use this version" }, icon("check"), "In use") : null,
               statusTag(v.status), el("span", { class: "muted small" }, `${v.filename} · uploaded ${relTime(v.uploaded_at)}`),
               retry ? el("span", { style: { marginLeft: "auto" } }, retry) : null),
             el("div", { class: "steps" }, labels.map((lab, i) => {
@@ -682,16 +722,14 @@ async function viewDocuments(root) {
               return el("div", { class: `step ${cls}` }, lab);
             })),
             v.status === "pending" ? el("div", { class: "small muted", style: { marginBottom: "6px" } },
-              "Waiting for the worker. If this does not move, check that ./start.sh is running (worker and Redis).") : null,
-            el("div", { class: "facts" },
-              el("span", {}, "Chunks ", el("b", { class: "tnum" }, fmtInt(v.chunks))),
-              el("span", {}, "Vectors ", el("b", { class: "tnum" }, v.points == null ? "–" : fmtInt(v.points))),
-              el("span", {}, "Size ", el("b", {}, fmtBytes(v.size_bytes))),
-              el("span", {}, "Parsed ", el("b", {}, v.parsed_at ? relTime(v.parsed_at) : "–")),
-              el("span", {}, "Indexed ", el("b", {}, v.indexed_at ? relTime(v.indexed_at) : "–"))),
-            v.error ? el("div", { class: "error-box" }, el("b", {}, "Error: "), v.error) : null,
+              "Waiting to start. If this does not change within a few minutes, the background services may be stopped (an engineer can run ./start.sh).") : null,
+            el("div", { class: "facts", title: `Technical: ${fmtInt(v.chunks)} chunks · ${v.points == null ? "–" : fmtInt(v.points)} vectors · parsed ${v.parsed_at ? relTime(v.parsed_at) : "–"} · indexed ${v.indexed_at ? relTime(v.indexed_at) : "–"}` },
+              el("span", {}, "Searchable sections ", el("b", { class: "tnum" }, fmtInt(v.chunks))),
+              el("span", {}, "File size ", el("b", {}, fmtBytes(v.size_bytes))),
+              el("span", {}, "Ready ", el("b", {}, v.indexed_at ? relTime(v.indexed_at) : "not yet"))),
+            v.error ? el("div", { class: "error-box" }, el("b", {}, "What went wrong: "), v.error) : null,
             actionOut,
-            v.warnings.length ? el("details", { class: "warn" }, el("summary", {}, `${v.warnings.length} parse warning${v.warnings.length === 1 ? "" : "s"}`),
+            v.warnings.length ? el("details", { class: "warn" }, el("summary", {}, `${v.warnings.length} note${v.warnings.length === 1 ? "" : "s"} from reading the PDF`),
               el("ul", {}, v.warnings.slice(0, 40).map((w) => el("li", {}, w)))) : null);
         }));
     }));
@@ -750,7 +788,7 @@ async function viewWorkflows(root) {
     el("h2", {}, "Ask about the reports"),
     el("p", {}, "AEIDS finds the figures in the uploaded reports, does the maths, and checks every number against its page before showing it."),
     el("div", { style: { marginTop: "16px" } }, form), note),
-    card("Your questions", state.tenant ? `reports of ${state.tenant}` : null, list)]);
+    card("Questions asked so far", "click one to see its answer", list)]);
   await load();
   input.focus();
   return { refresh: load };
@@ -833,7 +871,7 @@ function drawTechHead(box, wf) {
     el("div", {}, el("b", {}, fmtInt(counts.VERIFIED || 0)), "verified"),
     el("div", {}, el("b", {}, fmtInt(wf.tasks.reduce((s, t) => s + Math.max(0, t.attempts - 1), 0))), "retries"),
     el("div", {}, el("b", {}, fmtInt(wf.findings.length)), "findings"),
-    el("a", { class: "btn", href: `#/traces/${wf.trace_id}` }, icon("traces"), "Trace")));
+    el("a", { class: "btn", href: `#/traces/${wf.trace_id}` }, icon("traces"), "Run details")));
 }
 
 function drawAnswer(box, wf) {
@@ -998,7 +1036,7 @@ async function viewSearch(root) {
   const input = el("input", { type: "search", placeholder: "Ask about a report, e.g. What were total net sales in 2025?", "aria-label": "Question" });
   const results = el("div", { class: "grid", style: { gap: "14px" } });
   const modeSeg = el("div", { class: "seg" });
-  const modes = [["hybrid", "Hybrid"], ["dense", "Meaning"], ["keyword", "Exact words"]];
+  const modes = [["hybrid", "Best (both)"], ["dense", "By meaning"], ["keyword", "Exact words"]];
   const drawModes = () => modeSeg.replaceChildren(...modes.map(([k, n]) =>
     el("button", { type: "button", class: k === mode ? "on" : "", onclick: () => { mode = k; drawModes(); if (input.value.trim()) run(); } }, n)));
   drawModes();
@@ -1018,25 +1056,25 @@ async function viewSearch(root) {
       .filter((w) => !["what", "were", "was", "the", "how", "much", "did", "does", "which", "and", "for", "its", "with", "from", "this", "that"].includes(w));
     const maxScore = Math.max(...out.hits.map((h) => h.score), 1e-9);
     results.replaceChildren(
-      el("div", { class: "row small muted" }, `${out.hits.length} results · mode `, el("b", {}, out.mode),
+      el("div", { class: "row small muted" }, `${out.hits.length} results, best match first`,
         out.warnings.map((w) => el("span", { class: "status warning" }, icon("alert"), w)),
-        el("span", { style: { marginLeft: "auto" } }, el("a", { href: `#/traces/${out.trace_id}` }, "View the trace of this search →"))),
+        el("span", { style: { marginLeft: "auto" } }, el("a", { href: `#/traces/${out.trace_id}` }, "Technical details of this search →"))),
       ...(out.hits.length ? out.hits.map((h, i) => el("div", { class: `card hit-card fade-in ${i === 0 ? "top" : ""}` },
         el("div", { class: "rank" }, String(i + 1)),
         el("div", { style: { minWidth: 0 } },
           el("div", { class: "hit-meta" }, el("span", { class: "co" }, h.company_name),
-            el("span", {}, h.filename), el("span", { class: "badge" }, `p. ${h.page_start}${h.page_end !== h.page_start ? `–${h.page_end}` : ""}`),
-            el("span", { class: "badge kind", vars: { "--c": h.kind === "table" ? "var(--s3)" : h.kind === "chart" ? "var(--s2)" : "var(--s1)" } }, h.kind),
+            el("span", {}, h.filename), el("span", { class: "badge" }, `page ${h.page_start}${h.page_end !== h.page_start ? `–${h.page_end}` : ""}`),
+            el("span", { class: "badge kind", vars: { "--c": h.kind === "table" ? "var(--s3)" : h.kind === "chart" ? "var(--s2)" : "var(--s1)" } }, { table: "Table", chart: "Chart", text: "Text" }[h.kind] || h.kind),
             h.fiscal_year ? el("span", { class: "badge" }, `FY${h.fiscal_year}`) : null,
-            h.is_current ? null : el("span", { class: "badge" }, `replaced v${h.version_number}`)),
+            h.is_current ? null : el("span", { class: "badge" }, `older version (v${h.version_number})`)),
           el("div", { class: "hit-section" }, h.section || "(no section)"),
           highlight(h.text.replace(/^Section: .*\n+/, ""), terms),
           el("div", { class: "hit-foot" },
-            el("span", { class: "muted" }, "score"), el("div", { class: "scorebar" }, el("span", { style: { width: `${(h.score / maxScore) * 100}%` } })),
-            el("span", { class: "badge" }, `meaning ${h.dense_rank ? "#" + h.dense_rank : "–"}`),
-            el("span", { class: "badge" }, `words ${h.keyword_rank ? "#" + h.keyword_rank : "–"}`),
+            el("span", { class: "muted" }, "match"),
+            el("div", { class: "scorebar", title: `Rank by meaning: ${h.dense_rank ? "#" + h.dense_rank : "–"} · by exact words: ${h.keyword_rank ? "#" + h.keyword_rank : "–"}` },
+              el("span", { style: { width: `${(h.score / maxScore) * 100}%` } })),
             el("button", { class: "linkbtn", type: "button", onclick: (e) => { const t = e.target.closest(".hit-card").querySelector(".hit-text"); t.classList.toggle("open"); e.target.textContent = t.classList.contains("open") ? "Show less" : "Show all"; } }, "Show all")))))
-        : [card(null, null, empty("search", "No results", "Nothing indexed matches in this tenant."))]));
+        : [card(null, null, empty("search", "No results", "Nothing in the uploaded reports matches. Try other words."))]));
   };
   const form = el("form", { class: "searchbar", onsubmit: (e) => { e.preventDefault(); run(); } },
     icon("search"), input, el("button", { class: "btn primary", type: "submit" }, "Search"));
@@ -1044,11 +1082,15 @@ async function viewSearch(root) {
     [5, 10, 20].map((n) => el("option", { value: n, selected: n === topK }, `${n} results`)));
   append(root, [el("div", { class: "card hero fade-in" },
     el("h2", {}, "Search the reports"),
-    el("p", {}, "Hybrid search fuses meaning (Qwen3 embeddings in Qdrant) with exact words (Postgres full-text) by reciprocal rank fusion. Each result shows where it ranked in both lists."),
+    el("p", {}, "Type a few words or a question. AEIDS shows the passages that match best, with the company, file and page. ",
+      "To get a worked-out answer instead, use ", el("a", { href: "#/workflows" }, "Ask a question"), "."),
     el("div", { style: { marginTop: "16px" } }, form),
-    el("div", { class: "row", style: { marginTop: "12px" } }, modeSeg, k,
-      el("label", { class: "toggle small" }, el("input", { type: "checkbox", onchange: (e) => { superseded = e.target.checked; } }), "Include replaced versions")),
-    el("div", { style: { marginTop: "12px" } }, chips)), results]);
+    el("div", { style: { marginTop: "12px" } }, chips),
+    el("details", { class: "opts" }, el("summary", {}, "Search options"),
+      el("div", { class: "row" }, modeSeg, k,
+        el("label", { class: "toggle small" }, el("input", { type: "checkbox", onchange: (e) => { superseded = e.target.checked; } }), "Include older versions")),
+      el("div", { class: "small muted", style: { marginTop: "8px" } },
+        "Best (both) combines search by meaning (AI embeddings) with search for the exact words, and usually works best."))), results]);
   // example questions: from the latest benchmark run when there is one
   try {
     const runs = await api("/evals");
@@ -1074,38 +1116,39 @@ function highlight(text, terms) {
 async function viewEvaluation(root, _arg, chosen) {
   const runs = await api("/evals");
   if (!runs.length) {
-    root.append(card(null, null, empty("evaluation", "No benchmark runs yet", "Run: .venv/bin/python eval/run_retrieval.py")));
+    root.append(card(null, null, empty("evaluation", "No quality test has been run yet", "An engineer can run: .venv/bin/python eval/run_retrieval.py")));
     return;
   }
   const name = chosen || runs[0].name;
   const run = await api(`/evals/${encodeURIComponent(name)}`);
-  const modes = [["dense", "Meaning (dense)", "var(--s1)"], ["keyword", "Exact words (keyword)", "var(--s5)"], ["hybrid", "Hybrid (RRF)", "var(--series-lime)"]]
+  const modes = [["dense", "By meaning", "var(--s1)"], ["keyword", "Exact words", "var(--s5)"], ["hybrid", "Best (both)", "var(--series-brand)"]]
     .filter(([m]) => run.scores[m]);
-  const metrics = [["recall@5", "Recall@5"], ["recall@10", "Recall@10"], ["mrr@10", "MRR@10"]];
+  const metrics = [["recall@5", "Found in top 5"], ["recall@10", "Found in top 10"], ["mrr@10", "Rank score (MRR)"]];
   const best = modes.reduce((a, b) => (run.scores[b[0]]["recall@5"] > run.scores[a[0]]["recall@5"] ? b : a));
   const picker = el("select", { class: "select", "aria-label": "Benchmark run", onchange: (e) => { root.replaceChildren(); viewEvaluation(root, null, e.target.value); } },
     runs.map((r) => el("option", { value: r.name, selected: r.name === name }, fmtDate(r.created_at))));
 
   const hero = el("div", { class: "card hero fade-in" },
-    el("div", { class: "row" }, el("h2", { style: { margin: 0 } }, "Retrieval benchmark"), el("span", { style: { marginLeft: "auto" } }, picker)),
-    el("p", { style: { marginTop: "6px" } }, `${run.questions.length} questions over ${run.corpus.length} annual reports (${run.corpus.join(", ")}), embeddings ${run.embedding_model}. `,
-      "A question counts as found when a chunk of the right report covering a gold page (where the answer is printed) is in the top K."),
+    el("div", { class: "row" }, el("h2", { style: { margin: 0 } }, "How well does search find the right page?"), el("span", { style: { marginLeft: "auto" } }, picker)),
+    el("p", { style: { marginTop: "6px" } }, `We ask ${run.questions.length} test questions about ${run.corpus.length} annual reports (${run.corpus.join(", ")}) for which we know the page that holds the answer. `,
+      "A question passes when that page is among the first 5 (or 10) results. Higher is better."),
+    el("p", { class: "small muted", style: { marginTop: "6px" } }, `Embeddings: ${run.embedding_model}. The rank score (MRR) is higher when the right page comes earlier in the list.`),
     el("div", { class: "grid g-kpi", style: { marginTop: "18px", gridTemplateColumns: "repeat(4, minmax(0,1fr))" } },
-      el("div", {}, el("div", { class: "small muted" }, "Best mode"), el("div", { style: { fontSize: "22px", fontWeight: 700 } }, best[1])),
-      ...metrics.map(([k, label]) => el("div", {}, el("div", { class: "small muted" }, `${label} (${best[0]})`),
+      el("div", {}, el("div", { class: "small muted" }, "Best search type"), el("div", { style: { fontSize: "22px", fontWeight: 700 } }, best[1])),
+      ...metrics.map(([k, label]) => el("div", {}, el("div", { class: "small muted" }, label),
         el("div", { class: "tnum", style: { fontSize: "28px", fontWeight: 700 } }, pct(run.scores[best[0]][k]))))));
 
   const chartBox = el("div", { class: "chart" });
-  const scores = card("Scores by mode", "higher is better",
+  const scores = card("Scores by search type", "higher is better",
     el("div", { class: "legend", style: { marginBottom: "10px" } }, modes.map(([, label, c]) => el("span", {}, el("i", { style: { background: c } }), label))),
     chartBox,
     el("div", { class: "table-wrap", style: { marginTop: "12px" } }, el("table", { class: "data" },
-      el("thead", {}, el("tr", {}, el("th", {}, "Mode"), metrics.map(([, l]) => el("th", { class: "num" }, l)))),
+      el("thead", {}, el("tr", {}, el("th", {}, "Search type"), metrics.map(([, l]) => el("th", { class: "num" }, l)))),
       el("tbody", {}, modes.map(([m, label]) => el("tr", {}, el("td", {}, label), metrics.map(([k]) => el("td", { class: "num" }, pct(run.scores[m][k])))))))));
 
   const heatColor = (r) => r == null ? null : r === 1 ? 1 : r <= 3 ? 2 : r <= 5 ? 3 : 4;
   const heat = el("div", { class: "heat" },
-    el("div", { class: "h" }, "id"), el("div", { class: "h" }, "Question"), modes.map(([m]) => el("div", { class: "h", style: { textAlign: "center" } }, m)),
+    el("div", { class: "h" }, "id"), el("div", { class: "h" }, "Question"), modes.map(([m, label]) => el("div", { class: "h", style: { textAlign: "center" }, title: label }, { dense: "meaning", keyword: "words", hybrid: "both" }[m] || m)),
     run.questions.map((q) => [
       el("div", { class: "id" }, q.id), el("div", { class: "q", title: q.question }, q.question),
       modes.map(([m]) => {
@@ -1115,13 +1158,13 @@ async function viewEvaluation(root, _arg, chosen) {
         return hover(cell, `${q.id} · ${m}`, () => [["rank", r ? `#${r}` : "not in top 10"], ["gold pages", q.pages.join(", ")],
           ...((q[m]?.top || []).slice(0, 3).map((t, i) => [`top ${i + 1}`, `${t.doc.replace(".pdf", "")} p.${t.pages[0]}`]))]);
       })]));
-  const legendScale = el("div", { class: "scale", style: { marginBottom: "10px" } }, "Rank of the first right chunk:",
+  const legendScale = el("div", { class: "scale", style: { marginBottom: "10px" } }, "Position of the right page in the results:",
     [[1, "#1"], [2, "#2–3"], [3, "#4–5"], [4, "#6–10"]].map(([b, l]) => el("span", {}, el("span", { class: "sw", style: { background: `var(--heat-${b})` } }), " ", l)),
     el("span", {}, el("span", { class: "sw", style: { background: "repeating-linear-gradient(135deg, var(--surface-3) 0 4px, transparent 4px 8px)" } }), " not found"));
-  const perQ = card("Every question", "hover a cell for the gold pages and the top hits", legendScale, heat);
+  const perQ = card("Every test question", "hover a cell for the answer pages and the top results", legendScale, heat);
 
   const history = runs.length > 1 ? card("Run history", null, el("div", { class: "table-wrap" }, el("table", { class: "data" },
-    el("thead", {}, el("tr", {}, el("th", {}, "Run"), el("th", {}, "Model"), modes.map(([m]) => el("th", { class: "num" }, `${m} R@5`)))),
+    el("thead", {}, el("tr", {}, el("th", {}, "Run"), el("th", {}, "Model"), modes.map(([, label]) => el("th", { class: "num" }, `${label}: top 5`)))),
     el("tbody", {}, runs.map((r) => el("tr", {}, el("td", {}, fmtDate(r.created_at)), el("td", {}, r.embedding_model),
       modes.map(([m]) => el("td", { class: "num" }, pct(r.scores?.[m]?.["recall@5"]))))))))) : null;
 
@@ -1132,11 +1175,11 @@ async function viewEvaluation(root, _arg, chosen) {
 
 /* ---------------- traces ---------------- */
 function traceTable(rows, compact = false) {
-  if (!rows.length) return empty("traces", "No runs recorded yet", "Upload a document or run a search; each run appears here.");
+  if (!rows.length) return empty("traces", "Nothing has run yet", "Upload a report or run a search; each run appears here.");
   const maxDur = Math.max(1, ...rows.map((r) => r.duration_ms || 0));
   return el("div", { class: "table-wrap" }, el("table", { class: "data" },
-    el("thead", {}, el("tr", {}, el("th", {}, "Status"), el("th", {}, "Run"), compact ? null : el("th", {}, "Input"),
-      compact ? null : el("th", {}, "Tenant"), el("th", { class: "num" }, "Steps"), el("th", { class: "num" }, "Tokens"),
+    el("thead", {}, el("tr", {}, el("th", {}, "Status"), el("th", {}, "What ran"), compact ? null : el("th", {}, "Input"),
+      compact ? null : el("th", {}, "Workspace"), el("th", { class: "num" }, "Steps"), el("th", { class: "num" }, "AI tokens"),
       el("th", { class: "num" }, "Cost"), el("th", { class: "num" }, "Duration"), el("th", { class: "num" }, "Started"))),
     el("tbody", {}, rows.map((r) => el("tr", { class: "click", onclick: () => { location.hash = `#/traces/${r.trace_id}`; } },
       el("td", {}, runStatus(r.status)),
@@ -1169,7 +1212,7 @@ async function viewTraces(root) {
     el("select", { class: "select", "aria-label": "Status", onchange: (e) => { f.status = e.target.value; load(); } },
       el("option", { value: "" }, "Any status"), el("option", { value: "ok" }, "OK"), el("option", { value: "error" }, "Error")));
   root.append(el("div", { class: "card fade-in" },
-    el("div", { class: "card-head" }, el("h2", {}, "Runs"), count, el("div", { class: "right" }, filters)), tableBox));
+    el("div", { class: "card-head" }, el("h2", {}, "Run history"), count, el("div", { class: "right" }, filters)), tableBox));
   await load();
   return { refresh: load };
 }
@@ -1189,7 +1232,7 @@ async function viewTrace(root, traceId) {
 
   const head = el("div", { class: "card hero fade-in" },
     el("div", { class: "trace-head" },
-      el("a", { href: "#/traces", class: "btn icon", title: "All runs", "aria-label": "All runs" }, icon("back")),
+      el("a", { href: "#/traces", class: "btn icon", title: "Run history", "aria-label": "Run history" }, icon("back")),
       kindBadge(rootSpan.kind), el("h2", {}, rootSpan.name), runStatus(rootSpan.status),
       el("button", { class: "btn", type: "button", style: { marginLeft: "auto" }, onclick: () => navigator.clipboard?.writeText(traceId) }, icon("copy"), traceId.slice(0, 12) + "…")),
     el("div", { class: "trace-stats" },
@@ -1198,7 +1241,7 @@ async function viewTrace(root, traceId) {
       el("div", {}, el("b", {}, fmtInt(calls)), "model calls"),
       el("div", {}, el("b", {}, tokens ? fmtInt(tokens) : "–"), "tokens"),
       el("div", {}, el("b", {}, cost ? fmtCost(cost) : "–"), "cost"),
-      el("div", {}, el("b", {}, rootSpan.tenant || "–"), "tenant"),
+      el("div", {}, el("b", {}, rootSpan.tenant || "–"), "workspace"),
       el("div", {}, el("b", {}, fmtDate(data.started_at)), "started")));
 
   const tree = el("div");
@@ -1295,7 +1338,7 @@ async function viewLogs(root) {
   const srcColor = { tablelens: "var(--s4)", api: "var(--s1)", worker: "var(--s3)", start: "var(--s7)" };
   const term = el("div", { class: "terminal", role: "log", "aria-label": "Logs" });
   const info = el("span", { class: "sub" });
-  const sources = [["all", "All"], ["tablelens", "TableLens"], ["api", "API"], ["worker", "Worker"], ["start", "Launcher"]];
+  const sources = [["all", "All"], ["tablelens", "PDF reader"], ["api", "API"], ["worker", "Worker"], ["start", "Launcher"]];
   const srcSeg = el("div", { class: "seg" });
   const drawSrc = () => srcSeg.replaceChildren(...sources.map(([k, n]) =>
     el("button", { type: "button", class: k === f.source ? "on" : "", onclick: () => { f.source = k; drawSrc(); load(true); } }, n)));
@@ -1328,8 +1371,8 @@ async function viewLogs(root) {
     if (jump || atBottom) term.scrollTop = term.scrollHeight;
   };
   root.append(el("div", { class: "card fade-in" },
-    el("div", { class: "card-head" }, el("h2", {}, "Logs"), info,
-      el("div", { class: "right" }, el("span", { class: "small muted" }, "Turn on Live (top right) to follow"))),
+    el("div", { class: "card-head" }, el("h2", {}, "System logs"), info,
+      el("div", { class: "right" }, el("span", { class: "small muted" }, "Turn on Auto-update (top right) to follow"))),
     el("div", { class: "row", style: { marginBottom: "12px" } }, srcSeg, lvlSeg, search), term));
   await load(true);
   return { refresh: () => load(false) };
@@ -1340,7 +1383,7 @@ async function loadTenants(select) {
   try {
     const t = await api("/tenants");
     state.defaultTenant = t.default;
-    if (t.models) $("#model-chip").replaceChildren(el("b", {}, "Models"), `Embeddings: ${t.models.embedding}`, el("br"), `LLM: ${t.models.llm}`);
+    if (t.models) $("#model-chip").replaceChildren(el("b", {}, "AI models"), `Search: ${t.models.embedding}`, el("br"), `Answers: ${t.models.llm}`);
     const names = t.tenants.includes(t.default) ? t.tenants : [t.default, ...t.tenants]; // own tenant always listed
     state.tenants = names;
     let saved = select || null;
@@ -1365,9 +1408,9 @@ async function main() {
   buildNav();
   $("#refresh-btn").append(icon("refresh"));
   $("#refresh-btn").addEventListener("click", () => render());
-  setTheme(document.documentElement.dataset.theme || "dark");
+  setTheme(document.documentElement.dataset.theme === "dark" ? "dark" : "light");
   $("#theme-btn").addEventListener("click", () => {
-    setTheme(document.documentElement.dataset.theme === "light" ? "dark" : "light");
+    setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
     render(); // charts read the theme's colours when drawn
   });
   $("#tenant-select").addEventListener("change", (e) => {

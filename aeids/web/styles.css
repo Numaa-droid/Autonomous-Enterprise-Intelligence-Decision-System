@@ -1,72 +1,73 @@
-/* AEIDS dashboard. Chart colours: the validated reference palette (dataviz skill), with its own
-   dark steps; status colours are reserved and always paired with an icon + label. */
+/* AEIDS console. Palette "Harbour": navy ink, teal accent, light by default (dark on request).
+   Chart series: the validated reference palette (dataviz skill); status colours are reserved
+   and always paired with an icon + label. */
 
 :root {
-  color-scheme: dark;
-  /* brand: midnight black #0B0B0C, pure white #FFFFFF, lime green #C6F432 */
-  --page: #0b0b0c;
-  --surface: #141416;
-  --surface-2: #1a1a1d;
-  --surface-3: #232327;
-  --chart: #141416;
-  --ink: #ffffff;
-  --ink-2: #c9c9cc;
-  --muted: #8b8b91;
-  --grid: #2a2a2e;
-  --axis: #3a3a3f;
-  --line: rgba(255, 255, 255, 0.08);
-  --line-2: rgba(255, 255, 255, 0.15);
-  --accent: #c6f432;        /* fills: buttons, bars, active states */
-  --accent-2: #a9d81c;
-  --accent-ink: #c6f432;    /* accent as text / lines on the page */
-  --on-accent: #0b0b0c;     /* text on an accent fill */
-  --brand-mark: #c6f432;    /* single-series chart marks */
-  --series-lime: #7ba20b;   /* lime as one of several series: validated with blue + magenta */
-  --glow-1: rgba(198, 244, 50, 0.07);
-  --glow-2: rgba(198, 244, 50, 0.04);
-  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
-  --s5: #d55181; --s6: #0ca30c; --s7: #9085e9; --s8: #e66767;
-  --neutral: #6f6e69;
-  --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
-  --good-ink: #3ccf3c;
-  /* rank heatmap: one lime ramp, the best rank the most prominent step on this surface */
-  --heat-1: #c6f432; --heat-2: #9cc21e; --heat-3: #6b8714; --heat-4: #415210;
-  --heat-ink-1: #0b0b0c; --heat-ink-2: #0b0b0c; --heat-ink-3: #ffffff; --heat-ink-4: #ffffff;
-  --shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 12px 32px rgba(0, 0, 0, 0.35);
+  color-scheme: light;
+  --page: #f3f6fa;
+  --surface: #ffffff;
+  --surface-2: #f6f8fb;
+  --surface-3: #e8edf4;
+  --chart: #ffffff;
+  --ink: #0f1d33;
+  --ink-2: #44526a;
+  --muted: #66738a;
+  --grid: #e3e8ef;
+  --axis: #c3ccd8;
+  --line: rgba(15, 29, 51, 0.09);
+  --line-2: rgba(15, 29, 51, 0.16);
+  --accent: #0f766e;        /* fills: buttons, bars, active states */
+  --accent-2: #0d9488;
+  --accent-ink: #0f766e;    /* accent as text / lines on the page */
+  --on-accent: #ffffff;     /* text on an accent fill */
+  --brand-mark: #0f766e;    /* single-series chart marks */
+  --series-brand: #0d9488;  /* teal as one of several series, next to blue + magenta */
+  --glow-1: rgba(13, 148, 136, 0.10);
+  --glow-2: rgba(37, 99, 235, 0.06);
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+  --s5: #e87ba4; --s6: #008300; --s7: #6250d6; --s8: #e34948;
+  --neutral: #a3a19a;
+  --good: #0ca30c; --warning: #e09b00; --serious: #ec835a; --critical: #d03b3b;
+  --good-ink: #006300;
+  /* rank heatmap: one teal ramp, the best rank the darkest step on white */
+  --heat-1: #0b4f4a; --heat-2: #0f766e; --heat-3: #5ec4b8; --heat-4: #c9eee9;
+  --heat-ink-1: #ffffff; --heat-ink-2: #ffffff; --heat-ink-3: #0f1d33; --heat-ink-4: #0f1d33;
+  --shadow: 0 1px 2px rgba(15, 29, 51, 0.05), 0 8px 24px rgba(15, 29, 51, 0.06);
   --radius: 14px;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 
-:root[data-theme="light"] {
-  color-scheme: light;
-  --page: #f4f5f1;
-  --surface: #ffffff;
-  --surface-2: #f7f8f4;
-  --surface-3: #ecede7;
-  --chart: #ffffff;
-  --ink: #0b0b0c;
-  --ink-2: #4e4f52;
-  --muted: #74757a;
-  --grid: #e3e4de;
-  --axis: #c4c5bf;
-  --line: rgba(11, 11, 12, 0.09);
-  --line-2: rgba(11, 11, 12, 0.16);
-  --accent: #c6f432;
-  --accent-2: #b3e21f;
-  --accent-ink: #4a6600;    /* lime is unreadable as text on white: a dark lime instead */
-  --on-accent: #0b0b0c;
-  --brand-mark: #7fa30a;    /* visible on white */
-  --series-lime: #7fa30a;
-  --glow-1: rgba(198, 244, 50, 0.16);
-  --glow-2: rgba(198, 244, 50, 0.10);
-  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
-  --s5: #e87ba4; --s6: #008300; --s7: #6250d6; --s8: #e34948;
-  --neutral: #a3a19a;
-  --good-ink: #006300;
-  --heat-1: #3f5a00; --heat-2: #6e8f0b; --heat-3: #a6cb2a; --heat-4: #ddf59a;
-  --heat-ink-1: #ffffff; --heat-ink-2: #ffffff; --heat-ink-3: #0b0b0c; --heat-ink-4: #0b0b0c;
-  --shadow: 0 1px 2px rgba(11, 11, 11, 0.05), 0 8px 24px rgba(11, 11, 11, 0.06);
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0b1424;
+  --surface: #111d31;
+  --surface-2: #16243b;
+  --surface-3: #1f2f4a;
+  --chart: #111d31;
+  --ink: #eef3fa;
+  --ink-2: #b6c2d4;
+  --muted: #8694ab;
+  --grid: #23354f;
+  --axis: #35496a;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-2: rgba(255, 255, 255, 0.15);
+  --accent: #2dd4bf;
+  --accent-2: #14b8a6;
+  --accent-ink: #5eead4;
+  --on-accent: #042f2e;
+  --brand-mark: #2dd4bf;
+  --series-brand: #2bb5a6;
+  --glow-1: rgba(45, 212, 191, 0.08);
+  --glow-2: rgba(59, 130, 246, 0.07);
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+  --s5: #d55181; --s6: #0ca30c; --s7: #9085e9; --s8: #e66767;
+  --neutral: #6f6e69;
+  --warning: #fab219;
+  --good-ink: #3ccf3c;
+  --heat-1: #2dd4bf; --heat-2: #1a9c8e; --heat-3: #136b63; --heat-4: #0e423f;
+  --heat-ink-1: #042f2e; --heat-ink-2: #042f2e; --heat-ink-3: #ffffff; --heat-ink-4: #ffffff;
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 12px 32px rgba(0, 0, 0, 0.35);
 }
 
 * { box-sizing: border-box; }
@@ -438,7 +439,7 @@ details.warn ul { margin: 6px 0 0; padding-left: 18px; color: var(--muted); font
 .tabs button.on { color: var(--ink); border-bottom-color: var(--accent-ink); }
 
 /* ---------- logs ---------- */
-.terminal { background: #0a0a0b; border: 1px solid var(--line); border-radius: 12px; padding: 10px 0;
+.terminal { background: #0a1220; border: 1px solid var(--line); border-radius: 12px; padding: 10px 0;
   font-family: var(--mono); font-size: 12.5px; height: calc(100vh - 300px); min-height: 360px; overflow: auto; color: #d8d7d2; }
 .log-line { display: grid; grid-template-columns: 96px 84px 70px minmax(0, 1fr); gap: 10px; padding: 2px 14px; }
 .log-line:hover { background: rgba(255,255,255,.05); }
@@ -448,7 +449,7 @@ details.warn ul { margin: 6px 0 0; padding-left: 18px; color: var(--muted); font
 .log-line .txt { white-space: pre-wrap; word-break: break-word; }
 .log-line.ERROR .txt, .log-line.CRITICAL .txt { color: #f3a5a5; }
 .log-line.WARNING .txt { color: #f6d58f; }
-.lvl.INFO { color: #c6f432; } .lvl.WARNING { color: #fab219; } .lvl.ERROR, .lvl.CRITICAL { color: #ef6b6b; }
+.lvl.INFO { color: #5eead4; } .lvl.WARNING { color: #fab219; } .lvl.ERROR, .lvl.CRITICAL { color: #ef6b6b; }
 .lvl.DEBUG { color: #8d8c85; }
 
 /* ---------- workflows ---------- */
@@ -535,3 +536,25 @@ details.how[open] > summary::before { content: "▾ "; }
 details.how[open] > summary { margin-bottom: 8px; }
 details.how .card { box-shadow: none; }
 .answer-text { font-size: 17px; line-height: 1.6; margin: 0 0 6px; max-width: 920px; color: var(--ink); }
+
+/* ---------- plain-language home ---------- */
+.nav-label { margin: 16px 12px 4px; font-size: 11px; font-weight: 600; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.07em; }
+.health { display: inline-flex; align-items: center; gap: 8px; margin-top: 16px; padding: 7px 13px;
+  border-radius: 999px; font-size: 13.5px; font-weight: 600; border: 1px solid var(--line-2); background: var(--surface-2); }
+.health svg { width: 16px; height: 16px; }
+.health.good { color: var(--good-ink); border-color: color-mix(in srgb, var(--good) 40%, transparent); }
+.health.good svg { color: var(--good); }
+.health.critical { color: var(--critical); border-color: color-mix(in srgb, var(--critical) 45%, transparent); }
+.how-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.how-step { display: flex; flex-direction: column; gap: 8px; padding: 18px; border-radius: 12px;
+  background: var(--surface-2); border: 1px solid var(--line); }
+.how-step .num { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-weight: 700;
+  background: var(--accent); color: var(--on-accent); }
+.how-step h3 { margin: 0; font-size: 15.5px; }
+.how-step p { margin: 0; color: var(--ink-2); font-size: 13.5px; flex: 1; }
+.how-step .btn { align-self: flex-start; }
+details.opts { margin-top: 12px; }
+details.opts > summary { cursor: pointer; color: var(--ink-2); font-size: 13px; }
+details.opts[open] > summary { margin-bottom: 10px; }
+@media (max-width: 860px) { .how-steps { grid-template-columns: 1fr; } .nav-label { display: none; } }
