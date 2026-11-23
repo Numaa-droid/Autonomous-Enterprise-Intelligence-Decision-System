@@ -21,7 +21,10 @@ class Settings(BaseSettings):
     database_url: str = Field(
         default="sqlite:///./aeids.db",
         description="SQLAlchemy URL; Postgres in normal use, e.g. postgresql+psycopg://...",
+        repr=False,  # it holds the database password: never shown when settings are printed (D-034)
     )
+    # Host names the API answers to; anything else is refused (DNS rebinding, D-034)
+    allowed_hosts: list[str] = Field(default_factory=lambda: ["127.0.0.1", "localhost", "::1"], min_length=1)
     storage_root: Path = Path("./storage")
     max_upload_bytes: int = Field(default=100 * 1024 * 1024, gt=0)
     # TableLens _structure.json files grow to tens of MB on long reports

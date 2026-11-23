@@ -14,6 +14,7 @@ from sqlalchemy import text
 
 from aeids import tracing
 from aeids.api.routers import dashboard, documents, ingestion, search, workflows
+from aeids.api.security import LocalOnlyGuard
 from aeids.config import Settings, get_settings
 from aeids.db.session import make_engine, make_sessionmaker
 from aeids.documents import DocumentError
@@ -43,6 +44,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         "not final legal, financial or compliance determinations.",
         lifespan=lifespan,
     )
+    app.add_middleware(LocalOnlyGuard, allowed_hosts=settings.allowed_hosts)  # D-034
     app.state.settings = settings
     app.state.engine = engine
     app.state.sessionmaker = make_sessionmaker(engine)

@@ -84,6 +84,7 @@ def settings(database_url: str, storage_root: Path) -> Settings:
         storage_root=storage_root,
         max_upload_bytes=MAX_UPLOAD_BYTES,
         jobs_mode="off",  # tests that need processing switch it on with a fake TableLens
+        allowed_hosts=["127.0.0.1", "localhost", "::1", "testserver"],  # TestClient sends Host: testserver
     )
 
 
