@@ -524,6 +524,7 @@ Open **http://127.0.0.1:8001/ui** (after `./start.sh`). The colours are a mint p
 
 **The left panel** (like a chat app) is hidden at first; the panel icon at the top left opens it, and it stays as you left it. On a phone it slides in.
 
+- At the top, the name **AEIDS** with its full form, *Autonomous Enterprise Intelligence & Decision System* (also in the browser tab title).
 - **+ New question**, and the three pages: **Ask**, **Reports**, **Search**.
 - **Recent questions** and **Reports** start folded: click a heading to drop its list down, click again to fold it.
   - **Recent questions**: your 3 latest questions, each once, with a status dot. Click one to reopen its answer.
