@@ -324,6 +324,8 @@ The same 36 questions go to AEIDS and to a single-agent baseline: the same searc
 | Time per question, median / p95 | 4.6 s / 10.5 s | 2.0 s / 2.5 s |
 | Tokens / cost per question | 4,553 / USD 0.0004 | 3,395 / USD 0.0002 |
 
+Over three runs in the [Release 0 review](docs/RELEASE_0_REVIEW.md), AEIDS scored 89–92%. One lookup, Apple's diluted earnings per share, depends on how the planning model reads the question. The other numbers held in every run: 0% unchecked numbers, 100% on calculations and comparisons, and no errors.
+
 AEIDS is about 2 s slower and calculates and compares reliably, and every number it states is checked. Code reads values the tables already hold and the model is asked only when a match is unclear, which cut time per question from 22 s to under 5 s and tokens by half (D-030). Its three misses are headcounts printed only in prose. [Run it yourself](#end-to-end-benchmark).
 
 ---
@@ -335,7 +337,7 @@ AEIDS is about 2 s slower and calculates and compares reliably, and every number
 > **New in M4:** Document Intelligence reads reported values from the parsed tables, and the Financial Analyst calculates margins and growth with the calculation module. For example, *"Compare Apple's revenue and operating margin FY2023–FY2025"* on Apple's 10-K gives 6 reported values (page 32) and 5 calculations (operating margin 29.82% → 31.51% → 31.97%), all verified, for about USD 0.002.
 > **Metric knowledge base:** [`aeids/knowledge/metrics.yaml`](aeids/knowledge/metrics.yaml) defines 41 metrics (margins, growth, ROE, free cash flow, leverage, BRSR intensities, women's representation, LTIFR, CSR spend) as fixed recipes of tested calculation steps, plus how US GAAP, Ind AS and BRSR reports name each line item. The agents pick a metric and the facts; code runs the recipe.
 > **New in M5:** Verification replays every calculation and checks every value against the table cell it came from (value, page, unit, currency, scale, period, current version). Wrong findings go back for at most two rework rounds; what still fails is dropped and listed as a limitation; what cannot be checked automatically waits for a person in the console.
-> **New in M6:** a single-agent RAG baseline and one command that benchmarks both on 36 questions: AEIDS answers 92% correctly vs 69%, with no unchecked numbers (baseline: 12%), at a median 4.6 s and USD 0.0004 per question ([results](#does-aeids-beat-one-rag-prompt)).
+> **New in M6:** a single-agent RAG baseline and one command that benchmarks both on 36 questions: AEIDS answers 89–92% correctly (three runs) vs 69%, with no unchecked numbers (baseline: 12%), at a median 4.6 s and USD 0.0004 per question ([results](#does-aeids-beat-one-rag-prompt)).
 > **New in M7:** every completed question gets a stored, checked report (JSON and Markdown): the answer, every calculation with its inputs, numbered sources down to the page and evidence record, limitations, review status and how it was made. Before it is stored, code checks that it contains every verified finding and nothing else. A report that fails the check is not stored, and the workflow fails instead. Download it from the answer page, `GET /api/v1/workflows/{id}/report.md`, or `python -m aeids.reporting <id>`.
 > **Not yet:** values printed only in prose or charts are not extracted.
 

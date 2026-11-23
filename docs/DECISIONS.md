@@ -53,6 +53,21 @@ Record each design or library choice in a few lines: what was chosen, what else 
 
 ## Accepted decisions
 
+### D-032 — Release 0 review fixes: exact template summaries, labels settled by extraction, no silent calculation gaps
+- Date: 2026-11-23
+- Status: accepted
+- Decision:
+  - **Template summaries:** a summary written by code must be exactly what `template_summary` writes from the verified findings. Only an AI summary goes through the number check. That check had refused the passage count in "… in 5 passages …" and failed every answer made only of quotes.
+  - **Reports for older workflows:** if a report requested for an older workflow fails its check, the API returns 422 `report_check_failed` instead of a 500.
+  - **Ambiguous labels in the Financial Analyst:** a label printed for more than one line item ("Income from operations") counts for a line item only when it is one of that item's names *and* Document Intelligence extracted the fact for that item.
+  - **Refused calculations:** a calculation the analyst was asked for but refused is returned as `not_calculated`. The Supervisor lists it as "Could not be calculated from the verified figures: …", which makes the report partial.
+- Alternatives considered:
+  - Dropping the number check for code-written text: weaker than exact equality.
+  - Removing "Income from operations" from revenue's aliases: Ind AS reports print it for revenue.
+  - Leaving the analyst's warning in task output only: the reader never sees it.
+- Why: found by the Release 0 review ([RELEASE_0_REVIEW.md](RELEASE_0_REVIEW.md)). Tesla's operating margin was silently missing from a report marked "Complete".
+- Consequences / follow-ups: regression tests in `tests/test_report_m7.py`; each was confirmed to fail before its fix. Open items from the review: add earnings per share to the knowledge base, and add ESG / BRSR documents and an ambiguous-label question to the benchmark.
+
 ### D-031 — M7 reports: built from verified findings, checked by code, stored as JSON + Markdown in Postgres
 - Date: 2026-11-23
 - Status: accepted

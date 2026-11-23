@@ -73,7 +73,7 @@ Build vertically: get one question flowing end to end before polishing any singl
 - Run both systems on `eval/questions.jsonl`
 - Report: answer accuracy, citation correctness, unsupported-claim rate, latency, tokens/cost per question
 - **Done when:** one command produces a comparison table.
-- **Status:** done (D-029; speed and token work D-030). `.venv/bin/python eval/run_benchmark.py` on 36 questions: AEIDS 92% vs baseline 69% correct, 0% vs 12% unsupported numbers, median 4.6 s vs 2.0 s, USD 0.0004 vs 0.0002 per question; `tests/test_baseline_m6.py`, `tests/test_speed_d030.py`.
+- **Status:** done (D-029; speed and token work D-030). `.venv/bin/python eval/run_benchmark.py` on 36 questions: AEIDS 89–92% (three runs) vs baseline 69% correct, 0% vs 12% unsupported numbers, median 4.6 s vs 2.0 s, USD 0.0004 vs 0.0002 per question; `tests/test_baseline_m6.py`, `tests/test_speed_d030.py`.
 
 ### M7 — Report and polish
 - Report generator using only `verified` findings; includes citations, limitations, review status
@@ -165,12 +165,14 @@ Record format:
 **Metrics:** answer accuracy (within tolerance), citation correctness (cited page actually supports the claim), unsupported-claim rate, correct "not found" rate, latency, tokens and cost per question.
 
 ## 6. Release 0 checklist
-- [ ] Multiple reports uploaded; versions and processing status visible
-- [ ] Financial question → visible task plan with dependencies
-- [ ] Schema-valid agent outputs with evidence IDs
-- [ ] Deterministic, reproducible calculations with tests
-- [ ] Verification catches all injected faults; bounded rework works
-- [ ] Report contains only verified findings, citations and limitations
-- [ ] Resume after worker restart without duplicated work
-- [ ] Benchmark vs single-agent baseline runs from one command
-- [ ] README with diagram, benchmark table and demo
+All met, with the evidence for each, in [RELEASE_0_REVIEW.md](RELEASE_0_REVIEW.md) (2026-11-23).
+
+- [x] Multiple reports uploaded; versions and processing status visible
+- [x] Financial question → visible task plan with dependencies
+- [x] Schema-valid agent outputs with evidence IDs
+- [x] Deterministic, reproducible calculations with tests
+- [x] Verification catches all injected faults; bounded rework works
+- [x] Report contains only verified findings, citations and limitations
+- [x] Resume after worker restart without duplicated work
+- [x] Benchmark vs single-agent baseline runs from one command
+- [x] README with diagram, benchmark table and demo
