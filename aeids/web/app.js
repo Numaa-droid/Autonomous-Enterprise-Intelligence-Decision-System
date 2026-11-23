@@ -16,6 +16,9 @@ const P = {
   traces: '<path d="M3 6h7M6 12h9M9 18h12"/><circle cx="12" cy="6" r="1.6"/><circle cx="17" cy="12" r="1.6"/>',
   logs: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M13 15h4"/>',
   refresh: '<path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+  panel: '<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
   moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
   check: '<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>',
@@ -42,6 +45,63 @@ const P = {
 function icon(name) {
   const t = document.createElement("template");
   t.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[name] || ""}</svg>`;
+  return t.content.firstChild;
+}
+
+/* ---------------- illustrations (constant markup only; colours come from the theme) ---------------- */
+const ILL = {
+  ask: `<svg class="ill" viewBox="0 0 240 150" aria-hidden="true">
+    <ellipse class="i-soft" cx="120" cy="84" rx="112" ry="58"/>
+    <rect class="i-mint i-edge" x="52" y="28" width="92" height="112" rx="10" transform="rotate(-7 98 84)"/>
+    <rect class="i-paper i-edge" x="66" y="18" width="96" height="118" rx="10"/>
+    <rect class="i-accent" x="66" y="18" width="96" height="16" rx="8"/>
+    <rect class="i-accent" x="66" y="26" width="96" height="8"/>
+    <path class="i-line-soft" d="M78 46h60M78 56h44M78 66h52"/>
+    <rect class="i-accent-2" x="80" y="104" width="12" height="22" rx="3"/>
+    <rect class="i-accent" x="98" y="92" width="12" height="34" rx="3"/>
+    <rect class="i-accent-2" x="116" y="98" width="12" height="28" rx="3"/>
+    <path class="i-line" d="M76 128h60" />
+    <circle class="i-accent" cx="168" cy="72" r="27"/>
+    <circle class="i-paper" cx="168" cy="72" r="19"/>
+    <path class="i-line" d="M158 72h20M158 80h12" />
+    <path class="i-line" style="stroke-width:7" d="M187 92l18 18"/>
+    <circle class="i-good" cx="62" cy="30" r="15"/>
+    <path d="M55 30l5 5 9-10" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <path class="i-accent" d="M206 30l3 7 7 3-7 3-3 7-3-7-7-3 7-3z"/>
+    <path class="i-accent-2" d="M30 108l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/>
+  </svg>`,
+  upload: `<svg class="ill" viewBox="0 0 240 170" aria-hidden="true">
+    <ellipse class="i-soft" cx="120" cy="100" rx="112" ry="62"/>
+    <rect class="i-paper i-edge" x="84" y="18" width="72" height="92" rx="9"/>
+    <path class="i-mint" d="M134 18h13a9 9 0 0 1 9 9v13h-13a9 9 0 0 1-9-9z"/>
+    <path class="i-line-soft" d="M96 50h40M96 60h48M96 70h30"/>
+    <rect class="i-accent" x="96" y="82" width="38" height="18" rx="5"/>
+    <text x="115" y="95" text-anchor="middle" font-size="11" font-weight="800" class="i-ink" font-family="system-ui, sans-serif">PDF</text>
+    <rect class="i-mint i-edge" x="46" y="112" width="148" height="44" rx="12"/>
+    <rect class="i-mint-2 i-edge" x="46" y="112" width="148" height="14" rx="7"/>
+    <circle class="i-accent" cx="182" cy="50" r="18"/>
+    <path class="i-line" d="M182 59V41M174 49l8-8 8 8"/>
+    <circle class="i-good" cx="62" cy="64" r="11"/>
+    <path d="M57 64l4 4 7-8" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <path class="i-accent-2" d="M40 30l2.5 6 6 2.5-6 2.5-2.5 6-2.5-6-6-2.5 6-2.5z"/>
+  </svg>`,
+  pick: `<svg class="ill" viewBox="0 0 200 140" aria-hidden="true">
+    <ellipse class="i-soft" cx="104" cy="76" rx="94" ry="58"/>
+    <rect class="i-paper i-edge" x="60" y="22" width="120" height="30" rx="9"/>
+    <rect class="i-accent" x="68" y="29" width="16" height="16" rx="5"/>
+    <path class="i-line-soft" d="M92 33h60M92 41h40"/>
+    <rect class="i-paper i-edge" x="60" y="58" width="120" height="30" rx="9"/>
+    <rect class="i-accent" x="68" y="65" width="16" height="16" rx="5"/>
+    <path class="i-line-soft" d="M92 69h70M92 77h34"/>
+    <rect class="i-paper i-edge" x="60" y="94" width="120" height="30" rx="9"/>
+    <rect class="i-accent" x="68" y="101" width="16" height="16" rx="5"/>
+    <path class="i-line-soft" d="M92 105h52M92 113h44"/>
+    <path class="i-line" d="M44 74H18M28 64l-10 10 10 10"/>
+  </svg>`,
+};
+function ill(name) {
+  const t = document.createElement("template");
+  t.innerHTML = ILL[name];
   return t.content.firstChild;
 }
 
@@ -302,31 +362,93 @@ function donut(items, { size = 150, thickness = 22, centre, centreSub }) {
 
 /* ---------------- navigation ---------------- */
 const PAGES = [
-  ["overview", "Home", "What AEIDS does and how to start", "main"],
-  ["workflows", "Ask a question", "Ask about the reports; every number is checked before you see it", "main"],
-  ["documents", "Reports", "Upload company reports and see when each one is ready", "main"],
-  ["search", "Search", "Find the passages in the reports that mention something", "main"],
+  ["workflows", "Ask", "", "main"],
+  ["documents", "Reports", "Add company reports. Each one is ready to ask about after a few minutes.", "main"],
+  ["search", "Search", "Find what the reports say about something.", "main"],
+  ["overview", "System status", "Services, processing, activity, speed and cost", "tech"],
   ["evaluation", "Search quality", "How often search finds the right page, on a fixed set of test questions", "tech"],
   ["traces", "Run history", "Every run, step by step: time taken, AI usage and cost", "tech"],
   ["logs", "System logs", "Raw output of the background services", "tech"],
 ];
 function buildNav() {
-  const firstTech = PAGES.findIndex((p) => p[3] === "tech");
-  $("#nav").replaceChildren(...PAGES.flatMap(([id, label], i) => [
-    i === firstTech ? el("div", { class: "nav-label" }, "For engineers") : null,
-    el("a", { href: `#/${id}`, "data-page": id }, icon(id), label)].filter(Boolean)));
+  const link = ([id, label]) => el("a", { href: `#/${id}`, "data-page": id }, icon(id), label);
+  $("#nav").replaceChildren(...PAGES.filter((p) => p[3] === "main").map(link));
+  $("#more-menu").replaceChildren(...PAGES.filter((p) => p[3] === "tech").map(link));
+  $("#new-q").replaceChildren(icon("plus"), "New question");
+  // the panel: hidden or shown on wide screens (remembered), a slide-in drawer on phones
+  const phone = () => matchMedia("(max-width: 860px)").matches;
+  const drawer = (open) => $("#app").classList.toggle("side-open", open);
+  const collapse = (hidden, remember = true) => {
+    $("#app").classList.toggle("side-collapsed", hidden);
+    if (remember) { try { localStorage.setItem("aeids-side", hidden ? "hidden" : "shown"); } catch (e) { /* storage blocked */ } }
+  };
+  let saved = null;
+  try { saved = localStorage.getItem("aeids-side"); } catch (e) { /* storage blocked */ }
+  collapse(saved !== "shown", false); // hidden until the user opens it (then remembered)
+  $("#side-open").append(icon("panel"));
+  $("#side-open").title = "Show the panel";
+  $("#side-close").append(icon("panel"));
+  $("#side-close").title = "Hide the panel";
+  $("#side-close").setAttribute("aria-label", "Hide the panel");
+  $("#side-open").addEventListener("click", () => (phone() ? drawer(true) : collapse(false)));
+  $("#side-close").addEventListener("click", () => (phone() ? drawer(false) : collapse(true)));
+  $("#scrim").addEventListener("click", () => drawer(false));
+}
+
+/* ---------------- the side panel: question history and reports ---------------- */
+const DOT = { COMPLETED: "good", FAILED: "critical", CANCELLED: "", NEEDS_HUMAN_REVIEW: "warning" };
+const DOC_DOT = { indexed: "good", failed: "critical", pending: "progress", parsing: "progress", parsed: "progress", indexing: "progress" };
+function initials(name) {
+  const words = name.replace(/[^A-Za-z ]/g, " ").split(/\s+/)
+    .filter((w) => w && !/^(inc|corp|corporation|co|ltd|limited|plc|llc|the)$/i.test(w));
+  return (words.length > 1 ? words[0][0] + words[1][0] : (words[0] || "?").slice(0, 2)).toUpperCase();
+}
+async function loadSidebar() {
+  const seq = (state.sideSeq = (state.sideSeq || 0) + 1);
+  const [rows, docs] = await Promise.all([api(`/workflows?${tq()}`).catch(() => []), api(`/documents?${tq()}`).catch(() => [])]);
+  if (seq !== state.sideSeq) return;
+  state.side = { rows, docs };
+  drawSidebar();
+}
+function drawSidebar() {
+  if (!state.side) return;
+  const { rows, docs } = state.side;
+  const { page, arg } = route();
+  const seen = new Set();
+  const latest = rows.filter((w) => { const k = w.query.trim().toLowerCase(); return seen.has(k) ? false : seen.add(k); });
+  const limit = state.sideAll ? 50 : 6;
+  const more = latest.length > 6 ? el("button", { class: "side-more", type: "button",
+    onclick: () => { state.sideAll = !state.sideAll; drawSidebar(); } }, state.sideAll ? "Show fewer" : `Show all ${latest.length}`) : null;
+  $("#side-recent").replaceChildren(...(latest.length ? latest.slice(0, limit).map((w) =>
+    el("a", { class: `side-item${page === "workflows" && arg === String(w.id) ? " active" : ""}`, href: `#/workflows/${w.id}`, title: w.query },
+      el("span", { class: `dot ${DOT[w.status] ?? "progress"}` }), el("span", { class: "t" }, w.query)))
+    : [el("div", { class: "side-empty" }, "Your questions will appear here.")]), ...(more ? [more] : []));
+  $("#side-reports").replaceChildren(...(docs.length ? docs.map((d) => {
+    const v = d.versions.find((x) => x.is_current) || d.versions[d.versions.length - 1];
+    const fy = d.fiscal_year ? ` · FY${d.fiscal_year}` : "";
+    return el("a", { class: `side-item${page === "documents" && arg === String(d.id) ? " active" : ""}`, href: `#/documents/${d.id}`,
+      title: `${d.company}${fy} · ${(STATUS[v?.status] || [])[2] || v?.status || ""}` },
+      el("span", { class: "ava" }, initials(d.company)), el("span", { class: "t" }, `${d.company}${fy}`),
+      el("span", { class: `dot ${DOC_DOT[v?.status] || ""}` }));
+  }) : [el("div", { class: "side-empty" }, "No reports yet.")]));
 }
 function route() {
-  const [page = "overview", arg] = location.hash.replace(/^#\/?/, "").split("/");
-  return { page: PAGES.some(([id]) => id === page) ? page : "overview", arg: arg ? decodeURIComponent(arg) : null };
+  const [page = "workflows", arg] = location.hash.replace(/^#\/?/, "").split("/");
+  return { page: PAGES.some(([id]) => id === page) ? page : "workflows", arg: arg ? decodeURIComponent(arg) : null };
 }
 async function render(soft = false) {
   if (!soft) { hideTip(); clearTimeout(state.pageTimer); } // a tooltip over a replaced mark would stay open
   const { page, arg } = route();
   const meta = PAGES.find(([id]) => id === page);
-  document.querySelectorAll("#nav a").forEach((a) => a.classList.toggle("active", a.dataset.page === page));
-  $("#page-title").textContent = arg && page === "traces" ? "Run details" : arg && page === "workflows" ? "Your question" : meta[1];
-  $("#page-crumb").textContent = arg ? (page === "traces" ? `Run ${arg.slice(0, 12)}…` : "The answer, and how it was checked") : meta[2];
+  document.querySelectorAll("#nav a, #more-menu a").forEach((a) => a.classList.toggle("active", a.dataset.page === page && !(page === "workflows" && arg)));
+  $("#more").open = false;
+  $("#app").classList.remove("side-open");
+  if (!soft) loadSidebar().catch(() => {}); else drawSidebar();
+  $("#live-toggle").hidden = meta[3] !== "tech"; // live updates only matter on the engineers' pages
+  $("#page-title").textContent = arg && page === "traces" ? "Run details"
+    : ["workflows", "search"].includes(page) ? "" : meta[1]; // these pages carry their own heading
+  $("#page-crumb").textContent = arg && page === "traces" ? `Run ${arg.slice(0, 12)}…`
+    : arg && page === "documents" ? "One report: its status and versions. Pick another in the panel on the left." : meta[2];
   if (soft && state.current?.refresh) { try { await state.current.refresh(); } catch (e) { /* keep page */ } return; }
   // quick clicks (page, tenant, theme) can start several renders: only the newest may touch the page
   const seq = (state.renderSeq = (state.renderSeq || 0) + 1);
@@ -336,6 +458,7 @@ async function render(soft = false) {
   holder.append(el("div", { class: "skeleton" }), el("div", { class: "skeleton" }));
   const views = { overview: viewOverview, documents: viewDocuments, search: viewSearch, evaluation: viewEvaluation,
     traces: arg ? viewTrace : viewTraces, logs: viewLogs, workflows: arg ? viewWorkflow : viewWorkflows };
+  // documents/<id> shows one report
   try {
     const target = el("div", { style: { display: "contents" } });
     holder.append(target);
@@ -354,7 +477,7 @@ async function viewOverview(root) {
     api(`/workflows?${tq()}`).catch(() => [])]);
   const d = ov.documents, t = ov.totals_7d;
   state.models = ov.models;
-  $("#model-chip").replaceChildren(el("b", {}, "AI models"), `Search: ${ov.models.embedding}`, el("br"), `Answers: ${ov.models.llm}`);
+  $("#model-chip").replaceChildren(`AI models: ${ov.models.llm} (answers), ${ov.models.embedding} (search)`);
 
   // plain health line: one sentence for everyone; the per-service pills sit in the technical section
   const svcNames = { database: "Database", qdrant: "Search index", redis: "Job queue", tablelens: "PDF reader", openrouter: "AI models" };
@@ -366,22 +489,11 @@ async function viewOverview(root) {
       `Not everything is running: ${down.map((k) => svcNames[k]).join(", ")}. Ask an engineer to run ./start.sh.`)
     : el("div", { class: "health good", role: "status" }, icon("check"), "Everything is running");
   const hero = el("div", { class: "card hero fade-in" },
-    el("h2", {}, "Welcome to AEIDS"),
-    el("p", {}, "Upload company reports, ask a question in plain English, and get an answer in which every number is ",
-      "checked against the page it came from. AEIDS supports decisions; it does not replace a financial, legal or compliance review."),
+    el("h2", {}, "Is everything running?"),
+    el("p", {}, "The services AEIDS needs, what it has read, and how it has been used."),
     health);
 
   const ready = d.by_status.indexed || 0;
-  const step = (n, title, text, href, label) => el("div", { class: "how-step" },
-    el("div", { class: "num" }, String(n)), el("h3", {}, title), el("p", {}, text),
-    href ? el("a", { class: n === 2 ? "btn primary" : "btn", href }, label) : null);
-  const how = card("How it works", null, el("div", { class: "how-steps" },
-    step(1, "Upload the reports", "Add annual or ESG reports as PDF files. AEIDS reads the text and the tables; this takes a few minutes per report.",
-      "#/documents", d.documents ? "See the reports" : "Upload a report"),
-    step(2, "Ask a question", "For example: “What was Apple's operating margin in 2025?” or “Compare revenue growth of Microsoft and Nvidia.”",
-      "#/workflows", "Ask a question"),
-    step(3, "Read the checked answer", "Each number shows the report and page it came from, and any sums are done by a calculator, not by the AI. Anything that could not be checked is left out, and the answer says so.",
-      null, null)));
 
   const kpi = (ic, label, value, foot) => el("div", { class: "card kpi fade-in" },
     el("div", { class: "label" }, icon(ic), label), el("div", { class: "value tnum" }, value), el("div", { class: "foot" }, foot));
@@ -477,15 +589,15 @@ async function viewOverview(root) {
 
   const recent = card("Recent runs", null, traceTable(ov.recent_traces, true));
 
-  let opened = false;
-  try { opened = localStorage.getItem("aeids.techOpen") === "1"; } catch (e) { /* storage unavailable */ }
+  let opened = true; // this page is for engineers: details open unless they were folded
+  try { opened = localStorage.getItem("aeids.techOpen") !== "0"; } catch (e) { /* storage unavailable */ }
   const tech = el("details", { class: "card how", ...(opened ? { open: true } : {}),
     ontoggle: (e) => { try { localStorage.setItem("aeids.techOpen", e.target.open ? "1" : "0"); } catch (err) { /* ignore */ } } },
     el("summary", {}, el("b", {}, "Technical details"), el("span", { class: "muted small" }, " · services, pipeline, activity, speed and cost (for engineers)")),
     el("div", { class: "grid", style: { gap: "20px" } }, pills, kpis, pipeline,
       el("div", { class: "grid g-3" }, activity, latency, status), recent));
 
-  append(root, [hero, how, simple, failures, tech]);
+  append(root, [hero, simple, failures, tech]);
   drawActivity();
 }
 
@@ -609,9 +721,12 @@ function uploadPanel(companies, onUploaded) {
 
   const other = state.tenant && state.tenant !== state.defaultTenant;
   return el("div", { class: "card hero fade-in" },
-    el("div", { class: "row" }, el("h2", { style: { margin: 0 } }, "Upload a report"),
-      el("span", { class: "small muted" }, "A PDF annual or ESG report. AEIDS reads its text and tables and makes it searchable.")),
-    other ? notice("info", `You are looking at the "${state.tenant}" workspace. Uploads go to your own workspace ("${state.defaultTenant}"); the page switches there after uploading.`) : null,
+    el("div", { class: "upload-hero" },
+      el("div", {},
+        el("h2", { style: { margin: "0 0 4px" } }, "Upload a report"),
+        el("p", { style: { marginBottom: "14px" } }, "Add an annual or ESG report as a PDF. AEIDS reads its text and tables, and a few minutes later you can ask about it."),
+        other ? notice("info", `You are looking at the "${state.tenant}" workspace. Uploads go to your own workspace ("${state.defaultTenant}"); the page switches there after uploading.`) : null),
+      ill("upload")),
     form);
 }
 
@@ -652,7 +767,7 @@ async function processAgain(doc, v, btn, out) {
   } finally { btn.disabled = false; }
 }
 
-async function viewDocuments(root) {
+async function viewDocuments(root, selected) {
   const list = el("div", { class: "grid", style: { gap: "20px" } });
   // kept across redraws (the list redraws every few seconds while something is processing):
   // a document's upload controls (progress, message) and each version's retry message
@@ -661,7 +776,7 @@ async function viewDocuments(root) {
   let panelShown = false;
   let docs = [];
   const load = async () => {
-    try { docs = await api(`/documents?${tq()}`); }
+    try { docs = await api(`/documents?${tq()}`); if (state.side) { state.side.docs = docs; drawSidebar(); } }
     catch (e) { if (/no tenant/i.test(e.message)) docs = []; else throw e; }
     if (!panelShown) {
       root.prepend(uploadPanel([...new Set(docs.map((d) => d.company))], afterUpload));
@@ -682,15 +797,25 @@ async function viewDocuments(root) {
   };
   const drawList = () => {
     if (!docs.length) {
-      list.replaceChildren(card(null, null, empty("documents", "No reports yet", "Upload a PDF above. It shows up here, and you can follow it until it is ready.")));
+      list.replaceChildren(card(null, null, empty("documents", "No reports yet", "Upload a PDF above. It shows up in the panel on the left, and you can follow it until it is ready.")));
+      return;
+    }
+    // one report when picked in the side panel; otherwise only the ones still being read or failed
+    const shown = selected ? docs.filter((d) => String(d.id) === selected)
+      : docs.filter((d) => d.versions.some((v) => v.status !== "indexed" && (v.is_current || v.status === "failed" || IN_PROGRESS.includes(v.status))));
+    if (!shown.length) {
+      const ready = docs.filter((d) => d.versions.some((v) => v.is_current && v.status === "indexed")).length;
+      list.replaceChildren(el("div", { class: "card pick-card fade-in" }, ill("pick"),
+        el("div", {}, el("h3", {}, selected ? "This report is not in this workspace" : `All ${ready} report${ready === 1 ? " is" : "s are"} ready`),
+          el("p", {}, "Pick a report in the panel on the left to see its details, or upload another one above."))));
       return;
     }
     const companies = [...new Set(docs.map((d) => d.company))];
     const order = ["pending", "parsing", "parsed", "indexing", "indexed"];
     const labels = ["Uploaded", "Reading the PDF", "Read", "Making it searchable", "Ready to use"];
     const own = state.tenant === state.defaultTenant;
-    list.replaceChildren(...docs.map((doc) => {
-      const c = "var(--accent)"; // brand teal avatar
+    list.replaceChildren(...shown.map((doc) => {
+      const c = "var(--accent)"; // amber avatar
       const words = doc.company.replace(/[^A-Za-z ]/g, " ").split(/\s+/)
         .filter((w) => w && !/^(inc|corp|corporation|co|ltd|limited|plc|llc|the)$/i.test(w));
       const initials = (words.length > 1 ? words[0][0] + words[1][0] : (words[0] || "?").slice(0, 2)).toUpperCase();
@@ -710,12 +835,12 @@ async function viewDocuments(root) {
           const retry = v.status === "failed" && own
             ? el("button", { class: "btn", type: "button", onclick: (e) => processAgain(doc, v, e.currentTarget, actionOut).then(load) }, icon("refresh"), "Try again")
             : null;
-          return el("div", { class: "version" },
-            el("div", { class: "version-top" }, el("b", {}, `Version ${v.version_number}`),
-              v.is_current ? el("span", { class: "badge current", title: "Questions and search use this version" }, icon("check"), "In use") : null,
-              statusTag(v.status), el("span", { class: "muted small" }, `${v.filename} · uploaded ${relTime(v.uploaded_at)}`),
+          return el("div", { class: "version", title: `${fmtInt(v.chunks)} searchable sections · ${fmtBytes(v.size_bytes)} · ready ${v.indexed_at ? relTime(v.indexed_at) : "not yet"}` },
+            el("div", { class: "version-top" }, doc.versions.length > 1 ? el("b", {}, `Version ${v.version_number}`) : null,
+              v.is_current && doc.versions.length > 1 ? el("span", { class: "badge current", title: "Questions and search use this version" }, icon("check"), "In use") : null,
+              statusTag(v.status), el("span", { class: "muted small" }, `${doc.versions.length > 1 ? v.filename + " · " : ""}uploaded ${relTime(v.uploaded_at)}`),
               retry ? el("span", { style: { marginLeft: "auto" } }, retry) : null),
-            el("div", { class: "steps" }, labels.map((lab, i) => {
+            v.status === "indexed" ? null : el("div", { class: "steps" }, labels.map((lab, i) => {
               let cls = "";
               if (failedAt >= 0) cls = i < failedAt ? "done" : i === failedAt ? "failed" : "";
               else if (i < idx || (v.status === "indexed" && i <= idx)) cls = "done";
@@ -724,13 +849,9 @@ async function viewDocuments(root) {
             })),
             v.status === "pending" ? el("div", { class: "small muted", style: { marginBottom: "6px" } },
               "Waiting to start. If this does not change within a few minutes, the background services may be stopped (an engineer can run ./start.sh).") : null,
-            el("div", { class: "facts", title: `Technical: ${fmtInt(v.chunks)} chunks · ${v.points == null ? "–" : fmtInt(v.points)} vectors · parsed ${v.parsed_at ? relTime(v.parsed_at) : "–"} · indexed ${v.indexed_at ? relTime(v.indexed_at) : "–"}` },
-              el("span", {}, "Searchable sections ", el("b", { class: "tnum" }, fmtInt(v.chunks))),
-              el("span", {}, "File size ", el("b", {}, fmtBytes(v.size_bytes))),
-              el("span", {}, "Ready ", el("b", {}, v.indexed_at ? relTime(v.indexed_at) : "not yet"))),
             v.error ? el("div", { class: "error-box" }, el("b", {}, "What went wrong: "), v.error) : null,
             actionOut,
-            v.warnings.length ? el("details", { class: "warn" }, el("summary", {}, `${v.warnings.length} note${v.warnings.length === 1 ? "" : "s"} from reading the PDF`),
+            v.warnings.length && v.status !== "indexed" ? el("details", { class: "warn" }, el("summary", {}, `${v.warnings.length} note${v.warnings.length === 1 ? "" : "s"} from reading the PDF`),
               el("ul", {}, v.warnings.slice(0, 40).map((w) => el("li", {}, w)))) : null);
         }));
     }));
@@ -761,13 +882,15 @@ function stateTag(map, s) {
   return el("span", { class: `status ${cls}` }, icon(ic), label);
 }
 
+const EXAMPLES = ["What was Apple's operating margin in fiscal 2025?",
+  "Compare the net profit margins of Alphabet and Apple in 2025.",
+  "How much did Microsoft spend on research and development in fiscal 2025?"];
+
 async function viewWorkflows(root) {
-  const input = el("input", { type: "search", placeholder: "e.g. Compare Apple's revenue and operating margin FY2023–FY2025", "aria-label": "Question" });
+  const input = el("input", { type: "text", placeholder: "Ask anything about the uploaded reports…", "aria-label": "Your question", autocomplete: "off" });
   const note = el("div");
-  const list = el("div");
-  const form = el("form", { class: "searchbar", onsubmit: async (e) => {
-    e.preventDefault();
-    const query = input.value.trim();
+  const ready = el("div", { class: "ready-line" });
+  const ask = async (query) => {
     if (query.length < 3) return;
     note.replaceChildren(notice("info", "Starting…"));
     try {
@@ -775,21 +898,29 @@ async function viewWorkflows(root) {
         body: JSON.stringify({ tenant: state.tenant, query }) });
       location.hash = `#/workflows/${wf.id}`;
     } catch (err) { note.replaceChildren(notice("critical", el("b", {}, "Could not start: "), err.message)); }
-  } }, icon("workflows"), input, el("button", { class: "btn primary", type: "submit" }, "Ask"));
-  const load = async () => {
-    const rows = await api(`/workflows?${tq()}`);
-    list.replaceChildren(rows.length ? el("div", { class: "table-wrap" }, el("table", { class: "data" },
-      el("thead", {}, el("tr", {}, el("th", {}, "Question"), el("th", {}, "Status"), el("th", { class: "num" }, "Asked"))),
-      el("tbody", {}, rows.map((w) => el("tr", { class: "click", onclick: () => { location.hash = `#/workflows/${w.id}`; } },
-        el("td", {}, el("b", {}, w.query)), el("td", {}, stateTag(WF_STATE, w.status)),
-        el("td", { class: "num muted", title: fmtDate(w.created_at) }, relTime(w.created_at)))))))
-      : empty("workflows", "No questions yet", "Ask one above."));
   };
-  append(root, [el("div", { class: "card hero fade-in" },
-    el("h2", {}, "Ask about the reports"),
-    el("p", {}, "AEIDS finds the figures in the uploaded reports, does the maths, and checks every number against its page before showing it."),
-    el("div", { style: { marginTop: "16px" } }, form), note),
-    card("Questions asked so far", "click one to see its answer", list)]);
+  const form = el("form", { class: "ask-box", onsubmit: (e) => { e.preventDefault(); ask(input.value.trim()); } },
+    input, el("button", { class: "btn primary", type: "submit" }, "Ask"));
+  const chips = el("div", { class: "chips" }, EXAMPLES.map((q) =>
+    el("button", { class: "chip", type: "button", onclick: () => { input.value = q; ask(q); } }, q)));
+  const load = async () => {
+    const docs = await api(`/documents?${tq()}`).catch(() => []);
+    const n = docs.filter((d) => d.versions.some((v) => v.is_current && v.status === "indexed")).length;
+    ready.replaceChildren(n
+      ? `${n} report${n === 1 ? "" : "s"} ready to ask about · `
+      : "No reports yet · ", el("a", { href: "#/documents" }, n ? "Add more" : "Add a report first"));
+  };
+  const step = (ic, title, text) => el("div", { class: "step3" }, el("div", { class: "orb" }, icon(ic)),
+    el("div", {}, el("h3", {}, title), el("p", {}, text)));
+  append(root, [el("div", { class: "card hero ask-hero fade-in" },
+    el("div", { class: "ask-ill" }, ill("ask")),
+    el("h2", {}, "What would you like to know?"),
+    el("p", {}, "Ask in plain English. AEIDS finds the figures in your reports, does the maths with a calculator, and shows the page behind every number."),
+    form, chips, ready, note),
+    el("div", { class: "card fade-in" }, el("div", { class: "steps3" },
+      step("documents", "Add your reports", "Upload annual or ESG reports as PDFs on the Reports page."),
+      step("workflows", "Ask in plain English", "Margins, growth, comparisons between companies, or what a report says."),
+      step("check", "Every number is checked", "Each figure shows its report and page. Anything unchecked is left out.")))]);
   await load();
   input.focus();
   return { refresh: load };
@@ -808,6 +939,7 @@ async function viewWorkflow(root, id) {
     parts.techHead, parts.graph,
     el("div", { class: "grid g-2", style: { alignItems: "start" } }, parts.findings, parts.timeline), parts.report);
   append(root, [parts.head, parts.review, parts.answer, how]);
+  let sideDone = false;
   const load = async () => {
     const wf = await api(`/workflows/${encodeURIComponent(id)}?${tq()}`);
     drawHead(parts.head, wf);
@@ -818,6 +950,7 @@ async function viewWorkflow(root, id) {
     drawFindings(parts.findings, wf.findings);
     drawTimeline(parts.timeline, wf);
     drawReport(parts.report, wf.report);
+    if (WF_TERMINAL.includes(wf.status) && !sideDone) { sideDone = true; loadSidebar().catch(() => {}); }
     clearTimeout(state.pageTimer);
     if (!WF_TERMINAL.includes(wf.status) && route().page === "workflows") state.pageTimer = setTimeout(() => load().catch(() => {}), 2000);
   };
@@ -901,7 +1034,7 @@ function drawAnswer(box, wf) {
     el("ul", {}, a.limitations.map((l) => el("li", {}, l)))));
   blocks.push(el("div", { class: "small muted", style: { marginTop: "12px" } }, a.notice || ""));
   if (wf.status === "COMPLETED") blocks.push(el("div", { style: { marginTop: "14px" } },
-    el("a", { class: "btn", href: `${API}/workflows/${wf.id}/report.md${tq() ? "?" + tq() : ""}`, download: "" },
+    el("a", { class: "btn primary", href: `${API}/workflows/${wf.id}/report.md${tq() ? "?" + tq() : ""}`, download: "" },
       icon("download"), "Download the report (Markdown)"),
     el("span", { class: "small muted", style: { marginLeft: "10px" } }, "Answer, calculations, limitations, review and numbered sources, in one file.")));
   box.replaceChildren(card("Answer", null, blocks));
@@ -1100,8 +1233,8 @@ async function viewSearch(root) {
   try {
     const runs = await api("/evals");
     const qs = runs.length ? (await api(`/evals/${encodeURIComponent(runs[0].name)}`)).questions.map((q) => q.question) : [];
-    const picks = (qs.length ? [qs[0], qs[9], qs[13], qs[15], qs[22], qs[27]] : ["What were total revenues in 2025?", "What are the main risk factors?"]).filter(Boolean);
-    chips.replaceChildren(el("span", { class: "small muted" }, "Try:"), ...picks.map((q) => el("button", { class: "chip", type: "button", onclick: () => { input.value = q; run(); } }, q)));
+    const picks = (qs.length ? [qs[0], qs[13], qs[22]] : ["What were total revenues in 2025?", "What are the main risk factors?"]).filter(Boolean);
+    chips.replaceChildren(...picks.map((q) => el("button", { class: "chip", type: "button", onclick: () => { input.value = q; run(); } }, q)));
   } catch (e) { /* examples are optional */ }
   input.focus();
 }
@@ -1388,7 +1521,7 @@ async function loadTenants(select) {
   try {
     const t = await api("/tenants");
     state.defaultTenant = t.default;
-    if (t.models) $("#model-chip").replaceChildren(el("b", {}, "AI models"), `Search: ${t.models.embedding}`, el("br"), `Answers: ${t.models.llm}`);
+    if (t.models) $("#model-chip").replaceChildren(`AI models: ${t.models.llm} (answers), ${t.models.embedding} (search)`);
     const names = t.tenants.includes(t.default) ? t.tenants : [t.default, ...t.tenants]; // own tenant always listed
     state.tenants = names;
     let saved = select || null;
@@ -1402,7 +1535,10 @@ function setTheme(theme) {
   document.documentElement.dataset.theme = theme;
   try { localStorage.setItem("aeids-theme", theme); } catch (e) { /* storage blocked */ }
   const btn = $("#theme-btn");
-  btn.replaceChildren(icon(theme === "light" ? "moon" : "sun"), theme === "light" ? "Dark theme" : "Light theme");
+  const next = theme === "light" ? "Dark theme" : "Light theme";
+  btn.replaceChildren(icon(theme === "light" ? "moon" : "sun"));
+  btn.title = next;
+  btn.setAttribute("aria-label", next);
 }
 function setLive(on) {
   clearInterval(state.timer);
@@ -1424,6 +1560,7 @@ async function main() {
     render();
   });
   $("#auto-refresh").addEventListener("change", (e) => setLive(e.target.checked));
+  document.addEventListener("click", (e) => { if (!e.target.closest("#more")) $("#more").open = false; });
   window.addEventListener("hashchange", () => { render(); if ($("#auto-refresh").checked) setLive(true); });
   await loadTenants();
   render();
