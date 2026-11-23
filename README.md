@@ -100,7 +100,7 @@ flowchart LR
     class K,B2 warn
 ```
 
-You can watch each version go `pending → parsing → parsed → indexing → indexed` on the console's Documents page.
+You can watch each version go `pending → parsing → parsed → indexing → indexed` on the console's Reports page.
 
 </details>
 
@@ -339,6 +339,11 @@ AEIDS is about 2 s slower and calculates and compares reliably, and every number
 > **New in M5:** Verification replays every calculation and checks every value against the table cell it came from (value, page, unit, currency, scale, period, current version). Wrong findings go back for at most two rework rounds; what still fails is dropped and listed as a limitation; what cannot be checked automatically waits for a person in the console.
 > **New in M6:** a single-agent RAG baseline and one command that benchmarks both on 37 questions: AEIDS answers 89–92% correctly (over several runs) vs 68–69%, with no unchecked numbers (baseline: 12%), at a median 4.6 s and USD 0.0004 per question ([results](#does-aeids-beat-one-rag-prompt)).
 > **New in M7:** every completed question gets a stored, checked report (JSON and Markdown): the answer, every calculation with its inputs, numbered sources down to the page and evidence record, limitations, review status and how it was made. Before it is stored, code checks that it contains every verified finding and nothing else. A report that fails the check is not stored, and the workflow fails instead. Download it from the answer page, `GET /api/v1/workflows/{id}/report.md`, or `python -m aeids.reporting <id>`.
+> **Since the Release 0 review:**
+> - checks you can trust: an upload must be the type it says it is, and ESG questions are answered only from ESG reports or BRSRs (D-035);
+> - a local-only API guard and safer secrets (D-034);
+> - earnings per share in the knowledge base (D-033);
+> - a simpler console: mint and amber, a hideable history panel, illustrations.
 > **Not yet:** values printed only in prose or charts are not extracted.
 
 | Milestone | State |
@@ -362,12 +367,12 @@ cp .env.example .env        # set AEIDS_DB_PASSWORD (and the same in AEIDS_DATAB
 ./start.sh                  # Postgres, Qdrant, Redis, migrations, TableLens, API and worker
 ```
 
-Then open **http://127.0.0.1:8001/ui**: upload a report on **Reports**, ask a question on **Ask a question**, and watch every step on **Run history**.
+Then open **http://127.0.0.1:8001/ui**: ask a question on **Ask**, upload a report on **Reports**, and open the left panel (the panel icon at the top left) for your question history and reports.
 
 **A five-minute demo** (no GPU needed; it uses the five reports the benchmark loads):
 
 1. `.venv/bin/python eval/run_retrieval.py` loads Apple, Microsoft, NVIDIA, Tesla and Alphabet into the `eval` workspace (once, about USD 0.006).
-2. In the console, pick the **eval** workspace (top right), open **Ask a question** and ask *"Compare the net profit margins of Alphabet in 2025 and Apple in fiscal year 2025."*
+2. In the console, open the left panel, pick the **eval** workspace at its bottom, and on **Ask** ask *"Compare the net profit margins of Alphabet in 2025 and Apple in fiscal year 2025."*
 3. The answer page shows the two margins, the four figures they come from (with file and page), and a plain-English summary. Open **How AEIDS got this answer** to see the task plan, each check and the timeline.
 4. Click **Download the report (Markdown)**. The file has the answer, each calculation with its cited inputs, limitations, review status and numbered sources.
 5. Ask something the reports cannot answer (*"What were Apple's total net sales in fiscal year 2030?"*): AEIDS says so instead of guessing.
@@ -514,22 +519,33 @@ curl "http://127.0.0.1:8001/api/v1/documents/<document_id>/versions/<version_id>
 
 ## Console and run tracing
 
-Open **http://127.0.0.1:8001/ui** (after `./start.sh`). Pages:
+Open **http://127.0.0.1:8001/ui** (after `./start.sh`). The colours are a mint page (#F5FFF4) with an amber accent (#FFBB00); the moon / sun icon switches to the dark theme.
+
+**The left panel** (like a chat app) is hidden at first; the panel icon at the top left opens it, and it stays as you left it. On a phone it slides in.
+
+- **+ New question**, and the three pages: **Ask**, **Reports**, **Search**.
+- **Recent questions**, your history: each question once, with a status dot. Click one to reopen its answer; **Show all** lists every question.
+- **Reports**: each company's report with its year and status. Click one to see its versions and processing.
+- **At the bottom:**
+  - the **workspace** (`default` for your uploads, `eval` for the benchmark corpus);
+  - refresh and the theme switch;
+  - **More**, the engineers' pages.
 
 | Page | What you see |
 |---|---|
-| Overview | service health, totals, the ingestion pipeline, activity, latency by step, version states |
-| Documents | **upload** a PDF (drag and drop; company, type, fiscal year), upload a new version of a report, retry a failed one; every version's progress: uploaded → parsing → parsed → indexing → indexed & current (the page follows processing by itself) |
-| Search | ask a question; each hit shows company, page, section, and its rank by meaning and by exact words; link to its trace |
-| Evaluation | benchmark scores by mode, a rank heatmap for every question, run history |
-| Traces | every run (processing job, search, benchmark) as a timeline of steps, like LangSmith: timing, tokens, cost, inputs, outputs, errors |
-| Logs | TableLens, API, worker and launcher output (from `logs/`, written by `./start.sh`); filters and Live follow |
+| Ask | one question box, example questions, how many reports are ready, and how it works. The answer page shows the result, the figures it rests on with file and page, a plain-English summary, **Download the report**, and (folded) how AEIDS got it: task plan, checks, timeline |
+| Reports | **upload** a PDF (drag and drop; company, type, year). The type is checked against the PDF (D-035). Reports still being read, or that failed, appear here with their progress and a retry; pick any other report in the left panel |
+| Search | find what the reports say; each hit shows company, page, section and its rank by meaning and by exact words |
+| More → System status | services, totals, the ingestion pipeline, activity, latency by step, version states |
+| More → Search quality | benchmark scores by mode, a rank heatmap for every question, run history |
+| More → Run history | every run (processing job, search, question, benchmark) as a timeline of steps, like LangSmith: timing, tokens, cost, inputs, outputs, errors |
+| More → System logs | TableLens, API, worker and launcher output (from `logs/`, written by `./start.sh`); filters and Live follow |
 
-Use the tenant selector (top right) to switch between your uploads (`default`) and the benchmark corpus (`eval`). Traces are stored in Postgres (`trace_spans`); turn storing off with `AEIDS_TRACING_ENABLED=false`. The console has no login: keep the API on 127.0.0.1.
+Traces are stored in Postgres (`trace_spans`); turn storing off with `AEIDS_TRACING_ENABLED=false`. The console has no login: keep the API on 127.0.0.1.
 
 ## Workflows (ask a question)
 
-In the console open **Workflows**, or call the API:
+In the console open **Ask**, or call the API:
 
 ```bash
 curl -s http://127.0.0.1:8001/api/v1/workflows -H 'content-type: application/json' \
