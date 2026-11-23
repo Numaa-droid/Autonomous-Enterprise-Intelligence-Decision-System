@@ -43,7 +43,10 @@ class Settings(BaseSettings):
     # question vectors are cached in Postgres: the same question always gets the same vector
     query_embedding_cache: bool = True
     llm_model: str = "qwen/qwen3.8-flash"
-    llm_timeout_seconds: float = Field(default=120.0, gt=0)
+    # hidden "thinking" before a reply: off makes agent JSON calls 2-3x faster with the same
+    # answers, and avoids empty replies (the budget spent on thinking); D-030
+    llm_reasoning: Literal["off", "low", "medium", "high", "model_default"] = "off"
+    llm_timeout_seconds: float = Field(default=45.0, gt=0)  # per call; a stuck reply fails fast and is retried
     llm_max_retries: int = Field(default=3, ge=0, le=6)  # transient errors only (rule 8)
     llm_backoff_seconds: float = Field(default=1.0, ge=0)
 
@@ -68,6 +71,9 @@ class Settings(BaseSettings):
     # M4: "llm" runs the LLM agents, "stub" the M3 stand-ins, "auto" the LLM agents when an
     # OpenRouter key is set (D-025)
     agent_mode: Literal["auto", "llm", "stub"] = "auto"
+    # Document Intelligence: code picks a table cell when the match is clear and the model only
+    # the rest (code_first), or the model picks every cell (model); D-030
+    di_cell_resolver: Literal["code_first", "model"] = "code_first"
 
     # --- run tracing (D-022): spans stored in Postgres, shown in the dashboard ---
     tracing_enabled: bool = True

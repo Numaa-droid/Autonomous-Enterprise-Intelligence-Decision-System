@@ -201,7 +201,12 @@ class OpenRouterClient:
             payload["response_format"] = response_format
         if seed is not None:
             payload["seed"] = seed
-        with tracing.span("openrouter.chat", "llm", model=model, temperature=temperature,
+        reasoning = self._settings.llm_reasoning
+        if reasoning == "off":
+            payload["reasoning"] = {"enabled": False}
+        elif reasoning != "model_default":
+            payload["reasoning"] = {"effort": reasoning}
+        with tracing.span("openrouter.chat", "llm", model=model, temperature=temperature, reasoning=reasoning,
                           inputs={"messages": list(messages)}) as sp:
             result = self._chat_retrying(payload, model)
             sp.set(**_usage_attrs(result.model, result.usage, result.latency_ms, result.attempts),

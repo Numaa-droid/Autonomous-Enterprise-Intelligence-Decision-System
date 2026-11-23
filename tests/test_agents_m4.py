@@ -261,7 +261,15 @@ def test_a_match_outside_the_uploaded_companies_is_refused(env: Env) -> None:
     assert wf["tasks_by_key"]["extract"]["status"] == "NEEDS_HUMAN_REVIEW" and not wf["findings"]
 
 
+def model_picks(e: Env) -> None:
+    """For tests of the model's cell picks: code-first picking off (D-030)."""
+    e.state.settings = e.state.settings.model_copy(update={"di_cell_resolver": "model"})
+    e.state.registry = build_registry(e.state.settings, llm=e.llm)
+
+
 def test_invented_or_empty_cells_are_ignored(env: Env) -> None:
+    model_picks(env)
+
     def picks(user: str) -> dict:
         real = FakeLLM.default_picks(user)["facts"][:1]
         return {"facts": [*real, {"metric": "Revenue", "cell": "T9.R0.C1"},  # no such table
@@ -279,7 +287,8 @@ def test_invented_or_empty_cells_are_ignored(env: Env) -> None:
 
 
 def test_nothing_found_is_a_limitation_not_a_guess(env: Env) -> None:
-    env.llm.picks = lambda user: {"facts": [], "not_found": ["Total revenue", "Operating income"]}
+    model_picks(env)
+    env.llm.picks =lambda user: {"facts": [], "not_found": ["Total revenue", "Operating income"]}
     wf = _ask(env, "Compare Apple's revenue and operating margin FY2023–FY2025")
     assert wf["status"] == "COMPLETED" and not [f for f in wf["findings"] if f["value"]]
     assert "Not found in the reports: Total revenue, Operating income" in wf["report"]["limitations"]
@@ -407,6 +416,7 @@ def test_knowledge_base_metrics_with_steps(env: Env, session: Session) -> None:
              "inputs": {"current": b[("Total net sales", "FY2025")], "previous": b[("Total net sales", "FY2024")]}},
         ], "calculations": []}
 
+    model_picks(env)
     env.llm.plan, env.llm.picks, env.llm.calcs = _kb_plan, _kb_picks, calcs
     wf = _ask(env, "What were Apple's return on equity, operating margin and revenue growth in FY2025?")
     assert wf["status"] == "COMPLETED", wf["tasks_by_key"]
@@ -425,7 +435,8 @@ def test_knowledge_base_metrics_with_steps(env: Env, session: Session) -> None:
     plan_user = next(u for s, u in env.llm.prompts if "understand the user's question" in s)
     extract_user = next(u for s, u in env.llm.prompts if "point at the cells" in s)
     analyse_user = next(u for s, u in env.llm.prompts if "Financial Analyst agent" in s)
-    assert "KNOWLEDGE BASE" in plan_user and "Energy intensity per rupee of turnover" in plan_user
+    assert "KNOWLEDGE BASE" in plan_user and "Return on equity" in plan_user
+    assert "Energy intensity per rupee of turnover" not in plan_user  # a financial question: no BRSR entries (D-030)
     assert "printed as: " in extract_user and "Revenue from operations" in extract_user
     assert "roe | Return on equity" in analyse_user and "equity_end later than equity_start" in analyse_user
 

@@ -276,20 +276,34 @@ def run_metric(metric: Metric, bound: dict[str, Quantity]) -> list[StepRun]:
 
 # --- text for prompts ---------------------------------------------------------------------------
 
-def planning_catalog(kb: KnowledgeBase) -> str:
-    """Line items (with how reports print them) and metrics (with what they need)."""
-    items = [f"- {i.name} (printed as: {', '.join(i.aliases[:4])})" for i in kb.line_items.values()
-             if not i.reported_ratio_of]
-    printed = [f"- {i.name}" for i in kb.line_items.values() if i.reported_ratio_of or i.statement.startswith("brsr")
-               and i.unit == "percent"]
+FINANCIAL_STATEMENTS = ("income_statement", "balance_sheet", "cash_flow")
+ESG_WORDS = re.compile(r"\b(esg|brsr|sustainab\w*|energy|renewable|water|emissions?|ghg|carbon|scope\s*[123]|waste|"
+                       r"recycl\w*|wom[ae]n|female|gender|diversity|board|employees?|workforce|headcount|injur\w*|"
+                       r"ltifr|safety|well-?being|csr|social|turnover|msme|wages?)\b", re.I)
+
+
+def planning_catalog(kb: KnowledgeBase, question: str | None = None) -> str:
+    """Line items (with how reports print them) and metrics (with what they need).
+
+    With a ``question`` that mentions no ESG / BRSR topic, only the financial-statement line
+    items and the metrics built from them are listed: the rest cannot answer it, and leaving it
+    out halves the planning prompt (D-030). Without a question, everything is listed."""
+    esg = question is None or bool(ESG_WORDS.search(question))
+    keep = {k for k, i in kb.line_items.items() if esg or i.statement in FINANCIAL_STATEMENTS}
+    items = [f"- {i.name} (printed as: {', '.join(i.aliases[:4])})" for k, i in kb.line_items.items()
+             if not i.reported_ratio_of and k in keep]
+    printed = [f"- {i.name}" for k, i in kb.line_items.items() if k in keep and (
+        i.reported_ratio_of or i.statement.startswith("brsr") and i.unit == "percent")]
     metrics = []
     for m in kb.metrics.values():
+        if any(s.line_item != ANY and s.line_item not in keep for s in m.inputs.values()):
+            continue
         needs = sorted({_any_text(s) if s.line_item == ANY else kb.line_items[s.line_item].name
                         for s in m.inputs.values()})
         extra = " (also the previous year's balance)" if any(r.later and not m.same_line_item for r in m.periods) else ""
         metrics.append(f"- {m.name}: {m.formula}. Needs: {', '.join(needs)}{extra}")
     return ("LINE ITEMS (use these names):\n" + "\n".join(items)
-            + "\n\nRATIOS BRSR PRINTS ITSELF (can be read directly):\n" + "\n".join(dict.fromkeys(printed))
+            + "\n\nRATIOS BRSR PRINTS ITSELF (can be read directly):\n" + ("\n".join(dict.fromkeys(printed)) or "(none)")
             + "\n\nMETRICS:\n" + "\n".join(metrics))
 
 

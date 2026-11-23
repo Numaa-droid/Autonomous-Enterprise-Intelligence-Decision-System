@@ -8,7 +8,7 @@
   <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-source%20of%20truth-8b5cf6?style=flat-square">
   <img alt="Qdrant" src="https://img.shields.io/badge/Qdrant-hybrid%20search-2dd4bf?style=flat-square">
   <img alt="Agents" src="https://img.shields.io/badge/agents-Supervisor%20%C2%B7%20Analyst%20%C2%B7%20Verifier-a78bfa?style=flat-square">
-  <img alt="Status" src="https://img.shields.io/badge/Release%200-M1%E2%80%93M5%20done-22c55e?style=flat-square">
+  <img alt="Status" src="https://img.shields.io/badge/Release%200-M1%E2%80%93M6%20done-22c55e?style=flat-square">
 </p>
 
 <p align="center">
@@ -308,6 +308,24 @@ Every answer depends on finding the right page first, so it is measured. Combini
 
 </details>
 
+### Does AEIDS beat one RAG prompt?
+
+The same 36 questions go to AEIDS and to a single-agent baseline: the same search, the same model, one prompt that answers with citations. Both are scored the same way: the right numbers stated, cited pages that hold them, and no number the cited pages do not print (D-029).
+
+| | AEIDS | Baseline (one RAG prompt) |
+|---|---:|---:|
+| **Answers correct** | **92%** | 69% |
+| &nbsp;&nbsp;lookups (14) | 79% | 79% |
+| &nbsp;&nbsp;calculations (10) | 100% | 80% |
+| &nbsp;&nbsp;comparisons across companies (6) | 100% | 0% |
+| &nbsp;&nbsp;not in the reports, says so (6) | 100% | 100% |
+| Answers with a correct citation | 93% | 63% |
+| **Numbers not printed on a cited page** | **0%** of 65 | 12% of 48 |
+| Time per question, median / p95 | 4.6 s / 10.5 s | 2.0 s / 2.5 s |
+| Tokens / cost per question | 4,553 / USD 0.0004 | 3,395 / USD 0.0002 |
+
+AEIDS is about 2 s slower and calculates and compares reliably, and every number it states is checked. Code reads values the tables already hold and the model is asked only when a match is unclear, which cut time per question from 22 s to under 5 s and tokens by half (D-030). Its three misses are headcounts printed only in prose. [Run it yourself](#end-to-end-benchmark).
+
 ---
 
 ## Status
@@ -317,7 +335,8 @@ Every answer depends on finding the right page first, so it is measured. Combini
 > **New in M4:** Document Intelligence reads reported values from the parsed tables, and the Financial Analyst calculates margins and growth with the calculation module. For example, *"Compare Apple's revenue and operating margin FY2023–FY2025"* on Apple's 10-K gives 6 reported values (page 32) and 5 calculations (operating margin 29.82% → 31.51% → 31.97%), all verified, for about USD 0.002.
 > **Metric knowledge base:** [`aeids/knowledge/metrics.yaml`](aeids/knowledge/metrics.yaml) defines 41 metrics (margins, growth, ROE, free cash flow, leverage, BRSR intensities, women's representation, LTIFR, CSR spend) as fixed recipes of tested calculation steps, plus how US GAAP, Ind AS and BRSR reports name each line item. The agents pick a metric and the facts; code runs the recipe.
 > **New in M5:** Verification replays every calculation and checks every value against the table cell it came from (value, page, unit, currency, scale, period, current version). Wrong findings go back for at most two rework rounds; what still fails is dropped and listed as a limitation; what cannot be checked automatically waits for a person in the console.
-> **Not yet:** values printed only in prose or charts are not extracted; the single-agent baseline and benchmark are M6.
+> **New in M6:** a single-agent RAG baseline and one command that benchmarks both on 36 questions: AEIDS answers 92% correctly vs 69%, with no unchecked numbers (baseline: 12%), at a median 4.6 s and USD 0.0004 per question ([results](#does-aeids-beat-one-rag-prompt)).
+> **Not yet:** values printed only in prose or charts are not extracted.
 
 | Milestone | State |
 |---|---|
@@ -327,8 +346,8 @@ Every answer depends on finding the right page first, so it is measured. Combini
 | M3 Contracts and Supervisor: typed agent messages, task/workflow state machines, Supervisor with retries and rework, crash-safe workers, workflow API and console page (D-024) | ✅ done |
 | M4 LLM Document Intelligence and Financial Analyst, calculation module (D-025) | ✅ done |
 | M5 Verification replays calculations and checks quoted values; bounded rework; human review; fault-injection tests (D-027) | ✅ done |
-| M6 Single-agent RAG baseline and benchmark (AEIDS vs baseline) | ⏳ next |
-| M7 Report output and polish | ⬜ planned |
+| M6 Single-agent RAG baseline and benchmark (AEIDS vs baseline, D-029); fewer and smaller model calls (D-030) | ✅ done |
+| M7 Report output and polish | ⏳ next |
 
 ## Quick start
 
@@ -518,6 +537,18 @@ Each hit has its company, file, version, pages, section, kind (text / table / ch
 ```
 
 It loads the reports in [eval/corpus.csv](eval/corpus.csv) into a separate `eval` tenant from their existing TableLens output (no GPU), indexes them (about USD 0.006 of embeddings), and asks the 31 questions in [eval/retrieval_questions.jsonl](eval/retrieval_questions.jsonl). It prints Recall@5, Recall@10 and MRR@10 per mode and writes details to `reports/`. Results are repeatable (D-023): embeddings come from one pinned OpenRouter provider (`AEIDS_EMBEDDING_PROVIDER`, default `nebius`) and question vectors are cached, so a re-run gives identical ranks. Current: hybrid R@5 0.77, R@10 0.90, MRR 0.53. After changing provider or model, run with `--reindex`.
+
+### End-to-end benchmark
+
+```bash
+.venv/bin/python eval/run_benchmark.py                        # AEIDS and the baseline on all 36 questions
+.venv/bin/python eval/run_benchmark.py --systems baseline --types calculation
+.venv/bin/python eval/run_benchmark.py rescore reports/benchmark-<time>.json
+.venv/bin/python eval/run_benchmark.py check-gold             # gold pages from the TableLens output
+.venv/bin/python -m aeids.baseline "What were Apple's total net sales in 2025?" --tenant eval
+```
+
+It uses the `eval` tenant loaded by the retrieval benchmark and asks the questions in [eval/questions.jsonl](eval/questions.jsonl) (lookups, calculations, comparisons, and questions the reports cannot answer). It writes a comparison table to `reports/benchmark-<time>.md` and per-question details to the `.json` beside it; a full run costs about USD 0.02. Speed settings (D-030): `AEIDS_LLM_REASONING` (default `off`), `AEIDS_LLM_TIMEOUT_SECONDS` (45), `AEIDS_DI_CELL_RESOLVER` (`code_first`, or `model` to let the model pick every cell).
 
 ## Tests
 

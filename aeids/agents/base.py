@@ -9,6 +9,7 @@ reads is untrusted data, never instructions (rule 7).
 
 from __future__ import annotations
 
+import logging
 import uuid
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -32,6 +33,8 @@ from aeids.db.models import (
 from aeids.llm.embedding import Embedder
 from aeids.retrieval.search import SearchFilters, SearchHit, search
 from aeids.retrieval.vector_index import VectorIndex
+
+log = logging.getLogger(__name__)
 
 
 class Agent(Protocol):
@@ -102,6 +105,17 @@ class AgentContext:
                mode: str = "hybrid") -> list[SearchHit]:
         return search(self._session, self._index, self._embedder, self.tenant_id, query,
                       mode=mode, top_k=top_k, filters=filters or SearchFilters()).hits
+
+    def prefetch(self, queries: list[str]) -> None:
+        """Embed the queries of several coming searches in one request (they then hit the cache).
+        Best effort: a failure here is ignored, and each search embeds on its own as before."""
+        embed_many = getattr(self._embedder, "embed_queries", None)
+        if embed_many is None or not queries:
+            return
+        try:
+            embed_many([" ".join(q.split()) for q in dict.fromkeys(queries)])
+        except Exception as exc:  # noqa: BLE001 - search still works without the prefetch
+            log.warning("query prefetch failed (%s); searches embed one by one", exc)
 
     def evidence(self, ids: list[uuid.UUID]) -> dict[uuid.UUID, EvidenceView]:
         """Evidence records of this tenant (others are simply not found)."""

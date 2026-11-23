@@ -53,6 +53,32 @@ Record each design or library choice in a few lines: what was chosen, what else 
 
 ## Accepted decisions
 
+### D-030 — Fewer and smaller model calls: reasoning off, code picks clear cells, skipped calls
+- Date: 2026-11-23
+- Status: accepted
+- Decision:
+  - **Reasoning off by default.** Chat requests send `reasoning: {"enabled": false}` (`AEIDS_LLM_REASONING`: off / low / medium / high / model_default). Call timeout 120 s → 45 s (`AEIDS_LLM_TIMEOUT_SECONDS`), still retried within `llm_max_retries`.
+  - **Code picks the table cell when the match is clear** (`aeids/agents/document_intelligence/resolver.py`, `kb-match-v1`). A cell is picked when its row label (footnote marks stripped) is exactly one of the line item's printed names from the knowledge base, that name belongs to no other line item, the cell has a fiscal-year period and a fitting unit, and the candidates in primary statements (else all tables) hold one value. A line item is resolved for every company and year or not at all; the rest goes to the model with the unchanged extract prompt. Rework rounds always use the model. Facts record `picked_by` (code / model); the verifier checks both the same way. `AEIDS_DI_CELL_RESOLVER=model` restores the old behaviour.
+  - **Smaller planning prompt.** `knowledge.planning_catalog(kb, question)` lists only financial-statement line items and the metrics built from them unless the question mentions an ESG / BRSR topic (11.6k → 6.4k characters).
+  - **Skipped calls.** The Financial Analyst returns "no calculation asked for" without a model call when the question asks for none (`needs_calculation`; never on a rework round). The report writer uses its template for an answer of at most two reported figures and no calculations or passages.
+  - **Batched query embeddings.** `embed_queries` sends one request for the queries an agent will search, with an in-process memo in front of the SQL cache.
+  - **Fixes found by the benchmark.** Document Intelligence looks at 15 search hits and keeps up to 6 tables per query (the income statement of one report ranked 8th). When the planner lists no line item but the question names one word for word (`CellResolver.named_in`), it is searched anyway.
+- Alternatives considered: a smaller or different model (accuracy risk, and the cost was mostly in unneeded calls); caching whole answers (does not help new questions); letting code pick every cell (ambiguous names such as "Income from operations" mean revenue in some Ind AS reports and operating income in US GAAP ones).
+- Why: profiling showed Document Intelligence's cell picking was 70% of the time and 83% of the tokens, although TableLens had already read the tables; hidden reasoning made each call 2–3× slower with the same answers.
+- Consequences / follow-ups: benchmark (D-029) before → after: accuracy 89% → 92%, median 22.1 s → 4.6 s, p95 59 s → 10.5 s, tokens per question 9,544 → 4,553, cost USD 0.0017 → 0.0004; unsupported numbers stay 0%. Tests in `tests/test_speed_d030.py`. Outliers left are provider variance (a retried chat call, a slow embedding).
+
+### D-029 — M6: single-agent RAG baseline and an end-to-end benchmark
+- Date: 2026-11-23
+- Status: accepted
+- Decision:
+  - **Baseline** (`aeids/baseline/`, prompt `rag-v1`): the same hybrid search (top 8), the same model and one prompt that answers in JSON with cited source ids. Passages are wrapped as untrusted data; one retry on a schema error; unknown cited ids are dropped. CLI: `python -m aeids.baseline "question" --tenant eval`.
+  - **Questions** (`eval/questions.jsonl`, 36): 14 lookups, 10 calculations, 6 comparisons across companies, 6 not in the reports. Each has expected values (value, unit, scale, currency) and gold evidence as regex patterns over page text; `run_benchmark.py check-gold` re-derives the gold pages from the TableLens output.
+  - **Scoring** (`aeids/evaluation/scoring.py`), the same for both systems: an answer is correct when every expected value is stated (scale-aware; tolerance 0.5% for amounts and counts, 0.5 pp for percentages, 0.01 for ratios, 0.005 per share) and, for not-found questions, when it says so. Citation precision is against gold pages; a stated number is unsupported when it is printed on no cited page (AEIDS calculation outputs that verification replayed count as supported). Latency, tokens and cost are summed from each run's trace. A workflow stopped for human review counts as no answer, not an error.
+  - **One command**: `.venv/bin/python eval/run_benchmark.py` runs both systems on the `eval` tenant and writes `reports/benchmark-<time>.json` and `.md`; `rescore <file>` re-scores a saved run.
+- Alternatives considered: an LLM judge (non-deterministic, and it would grade a model with a model); exact string matching of answers (fails on "$416.2 billion" vs "416,161 million").
+- Why: Release 0's question is whether the multi-agent pipeline beats one RAG prompt, measured the same way on both.
+- Consequences / follow-ups: result (after D-030): AEIDS 92% vs baseline 69% (lookups 79/79, calculations 100/80, comparisons 100/0, not found 100/100); answers with a correct citation 93% vs 63%; unsupported numbers 0% vs 12%; median 4.6 s vs 2.0 s; 4,553 vs 3,395 tokens; USD 0.0004 vs 0.0002 per question. AEIDS misses the three headcount questions, whose values are printed only in prose (not extracted yet).
+
 ### D-028 — The answer page: a plain-English summary guarded to checked numbers
 - Date: 2026-11-22
 - Status: accepted

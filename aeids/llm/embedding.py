@@ -83,6 +83,7 @@ class OpenRouterEmbedder:
         self.dimension: int | None = None
         self.usage = Usage()
         self._lock = threading.Lock()  # batches run in parallel threads
+        self._memo: dict[str, list[float]] = {}  # query vectors of this process (bounded)
 
     @classmethod
     def from_settings(cls, settings: Settings, client: OpenRouterClient | None = None,
@@ -111,19 +112,45 @@ class OpenRouterEmbedder:
                 results = [f.result() for f in futures]  # keeps order; first error raises
         return [v for batch in results for v in batch]
 
-    def embed_query(self, text: str) -> list[float]:
+    def _query(self, text: str) -> tuple[str, str]:
         query = f"Instruct: {self.query_instruction}\nQuery: {text}" if self.query_instruction \
             else text
-        key = query_key(self.model, self.provider, query)
-        if self.cache is not None:
-            cached = self.cache.get(key)
-            if cached is not None:
-                self.cache_hits += 1
-                return cached
-        vector = self._embed([query])[0]
+        return query, query_key(self.model, self.provider, query)
+
+    def _known(self, key: str) -> list[float] | None:
+        vector = self._memo.get(key)
+        if vector is None and self.cache is not None:
+            vector = self.cache.get(key)
+        if vector is not None:
+            self.cache_hits += 1
+        return vector
+
+    def _remember(self, key: str, vector: list[float]) -> None:
+        if len(self._memo) >= 512:
+            self._memo.pop(next(iter(self._memo)))
+        self._memo[key] = vector
         if self.cache is not None:
             self.cache.put(key, self.model, self.provider, vector)
+
+    def embed_query(self, text: str) -> list[float]:
+        query, key = self._query(text)
+        vector = self._known(key)
+        if vector is None:
+            vector = self._embed([query])[0]
+            self._remember(key, vector)
         return vector
+
+    def embed_queries(self, texts: Sequence[str]) -> list[list[float]]:
+        """Several query vectors with one request for those not known yet (an agent's searches)."""
+        wanted = [self._query(t) for t in texts]
+        found = {key: v for _, key in wanted if (v := self._known(key)) is not None}
+        missing = list(dict.fromkeys((q, key) for q, key in wanted if key not in found))
+        for start in range(0, len(missing), self.batch_size):
+            batch = missing[start:start + self.batch_size]
+            for (_, key), vector in zip(batch, self._embed([q for q, _ in batch]), strict=True):
+                self._remember(key, vector)
+                found[key] = vector
+        return [found[key] for _, key in wanted]
 
     def _embed(self, texts: Sequence[str]) -> list[list[float]]:
         result = self.client.embed(texts, model=self.model, provider=self.provider,
@@ -155,6 +182,9 @@ class HashEmbedder:
 
     def embed_query(self, text: str) -> list[float]:
         return self._vector(text)
+
+    def embed_queries(self, texts: Sequence[str]) -> list[list[float]]:
+        return [self._vector(t) for t in texts]
 
     def _vector(self, text: str) -> list[float]:
         v = [0.0] * self.dimension

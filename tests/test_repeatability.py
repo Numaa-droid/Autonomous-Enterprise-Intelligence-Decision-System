@@ -80,14 +80,29 @@ def test_same_question_same_vector(session: Session, engine) -> None:
 
 
 def test_a_broken_cache_is_not_fatal() -> None:
-    """Cache unreachable: every question is embedded again, nothing fails."""
+    """Cache unreachable: nothing fails. A question asked again in the same process comes from
+    the in-process memo (D-030); a new process embeds it again."""
     from sqlalchemy import create_engine
 
     rec = Recorder()
-    emb = _embedder(rec, cache=SqlQueryCache(create_engine("sqlite:////nonexistent/dir/x.db")))
+    broken = SqlQueryCache(create_engine("sqlite:////nonexistent/dir/x.db"))
+    emb = _embedder(rec, cache=broken)
     emb.embed_query("q")
     emb.embed_query("q")
-    assert len(rec.requests) == 2 and emb.cache_hits == 0
+    assert len(rec.requests) == 1 and emb.cache_hits == 1
+    _embedder(rec, cache=broken).embed_query("q")
+    assert len(rec.requests) == 2
+
+
+def test_an_agents_queries_are_embedded_in_one_request() -> None:
+    rec = Recorder()
+    emb = _embedder(rec, cache=None)
+    emb.embed_query("b")
+    vectors = emb.embed_queries(["a", "b", "c", "a"])
+    assert len(vectors) == 4 and vectors[0] == vectors[3]
+    assert len(rec.requests) == 2  # "b" was known; "a" and "c" went in one request
+    assert rec.requests[1]["input"] == ["Instruct: Find\nQuery: a", "Instruct: Find\nQuery: c"]
+    assert emb.embed_query("c") == vectors[2] and len(rec.requests) == 2
 
 
 def test_reindex_in_place_keeps_the_document_searchable(client: TestClient, session: Session,

@@ -70,6 +70,11 @@ class ReportWriterAgent:
             return AgentResult(**_base(task, self.name), status="completed", outputs={"summary": None},
                                warnings=["nothing verified to summarise"])
         query = str(task.inputs.get("query") or task.objective)
+        if not arranged["results"] and not arranged["passages"] and len(arranged["reported"]) <= 2:
+            # one or two reported figures read well as the template sentence: no model call (D-030)
+            return AgentResult(**_base(task, self.name), status="completed",
+                               outputs={"summary": template_summary(arranged) or None, "summary_source": "template"},
+                               metrics=usage.metrics())
         message = f"QUESTION:\n{query}\n\nCHECKED FACTS:\n" + untrusted("facts", facts_text(arranged))
         warnings: list[str] = []
         for attempt in range(2):

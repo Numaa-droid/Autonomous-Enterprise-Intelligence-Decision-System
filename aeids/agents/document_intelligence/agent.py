@@ -8,7 +8,10 @@ Steps:
    (``needs_more_information``): AEIDS never answers from another company's data.
 2. **Search** (hybrid) for each line item within each company's current reports; keep table
    chunks only (chart values are read off images and are not checked evidence).
-3. **Point** (LLM, ``extract_v1.md``): the model names table cells (``T2.R5.C1``), never numbers.
+3. **Point**: code picks the cell when the match is clear (``resolver.py``: the row is a
+   printed name of the line item, the column the asked year, one value in the primary
+   statements); the model (``extract_v2.md``) names the cells (``T2.R5.C1``) of whatever is
+   left, never numbers. A rework round always goes to the model.
 4. **Resolve** deterministically: each cell's value, unit, currency, scale and period come from
    the normalised table (ingestion), the quote is the row exactly as it appears in the chunk,
    the page and box are the cell's. A reference to a cell that does not exist, or that holds no
@@ -32,6 +35,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from aeids import knowledge
 from aeids.agents.base import AgentContext, ChunkView, CompanyView
 from aeids.agents.cells import FY, column_name, read_cell, row_line
+from aeids.agents.document_intelligence.resolver import RESOLVER_VERSION, CellResolver
 from aeids.agents.llm_json import ChatModel, Usage, ask_json, load_prompt, untrusted
 from aeids.agents.stubs import _base, _filters, excerpt
 from aeids.config import Settings
@@ -41,7 +45,8 @@ from aeids.retrieval.search import SearchFilters, SearchHit
 HERE = Path(__file__).parent
 PROMPT_VERSION = "di-v2"  # + "+kb-<version>" of the metric knowledge base (D-026)
 MAX_TABLES = 10
-HITS_PER_QUERY = 6
+SEARCH_DEPTH = 15  # hits looked at per query; most are text, only tables are kept
+TABLES_PER_QUERY = 6
 PASSAGES = 5
 CELL = re.compile(r"^T(\d+)\.R(\d+)\.C(\d+)$")
 
@@ -125,7 +130,8 @@ class DocumentIntelligenceAgent:
         self.prompt_version = f"{PROMPT_VERSION}+kb-{self._kb.version}"
         self._plan_prompt = load_prompt(HERE / "plan_v2.md")
         self._extract_prompt = load_prompt(HERE / "extract_v2.md")
-        self._catalog = knowledge.planning_catalog(self._kb)
+        self._matcher = CellResolver(self._kb)
+        self._resolver = self._matcher if settings.di_cell_resolver == "code_first" else None
 
     # ---- the run ----
 
@@ -150,6 +156,12 @@ class DocumentIntelligenceAgent:
         companies = [by_name[m.match] for m in plan.companies if m.match] or available
         companies = list({c.company_id: c for c in companies}.values())
 
+        if not plan.metrics and (named := self._matcher.named_in(query)):
+            # the planner listed no line item, yet the question names one word for word (D-030)
+            years = [f"FY{y}" for y in dict.fromkeys(re.findall(r"\b((?:19|20)\d{2})\b", query))]
+            plan = plan.model_copy(update={
+                "metrics": [MetricRequest(name=n, search_query=f"consolidated statements {n}") for n in named],
+                "periods": plan.periods or years})
         if not plan.metrics:
             return self._passages(task, ctx, usage, query, companies, base_filters,
                                   note="the question asks for no reported numbers")
@@ -159,17 +171,32 @@ class DocumentIntelligenceAgent:
                                   note="no financial table matched the requested line items",
                                   not_found=[m.name for m in plan.metrics])
 
-        picks = ask_json(self._llm, CellPicks, self._extract_prompt,
-                         self._extract_message(query, plan, companies, tables, task), usage,
-                         model=self.model, max_tokens=3000)
-        return self._facts(task, ctx, usage, query, plan, picks, tables, companies, base_filters)
+        # code picks the cells it is sure of; the model only sees what is left (D-030)
+        if self._resolver is None or task.inputs.get("rework_instructions"):  # a rejected pick may be code's
+            resolved, left = [], [m.name for m in plan.metrics]
+        else:
+            r = self._resolver.resolve([m.name for m in plan.metrics], plan.periods, companies, tables)
+            resolved, left = r.picks, r.unresolved
+        facts = [CellPick(metric=m, cell=c) for m, c in resolved]
+        not_found: list[str] = []
+        if left:
+            rest = plan.model_copy(update={"metrics": [m for m in plan.metrics if m.name in left]})
+            picks = ask_json(self._llm, CellPicks, self._extract_prompt,
+                             self._extract_message(query, rest, companies, tables, task), usage,
+                             model=self.model, max_tokens=3000)
+            facts += picks.facts
+            not_found = picks.not_found
+        by_code = {c for _, c in resolved}
+        return self._facts(task, ctx, usage, query, plan, CellPicks(facts=facts, not_found=not_found),
+                           tables, companies, base_filters, by_code=by_code)
 
     # ---- prompts ----
 
     def _plan_message(self, query: str, available: list[CompanyView], task: TaskMessage) -> str:
         names = "\n".join(f"- {c.name}" for c in available)
+        catalog = knowledge.planning_catalog(self._kb, query)  # ESG/BRSR entries only when asked about
         return (f"QUESTION:\n{query}\n\nAVAILABLE COMPANIES (reports uploaded):\n{names}"
-                f"\n\nKNOWLEDGE BASE (version {self._kb.version}):\n{self._catalog}" + self._retry_notes(task))
+                f"\n\nKNOWLEDGE BASE (version {self._kb.version}):\n{catalog}" + self._retry_notes(task))
 
     def _extract_message(self, query: str, plan: QuestionPlan, companies: list[CompanyView],
                          tables: dict[str, _Table], task: TaskMessage) -> str:
@@ -201,15 +228,16 @@ class DocumentIntelligenceAgent:
     def _find_tables(self, ctx: AgentContext, plan: QuestionPlan, companies: list[CompanyView],
                      base: SearchFilters) -> dict[str, _Table]:
         lists: list[list[SearchHit]] = []
+        ctx.prefetch([f"{m.search_query} {m.name}" for m in plan.metrics])  # one embedding request
         for c in companies:
             filters = SearchFilters(company_ids=(c.company_id,), document_ids=base.document_ids,
                                     fiscal_years=base.fiscal_years)
             for m in plan.metrics:
-                hits = ctx.search(f"{m.search_query} {m.name}", top_k=HITS_PER_QUERY, filters=filters)
-                lists.append([h for h in hits if h.kind == "table"])
+                hits = ctx.search(f"{m.search_query} {m.name}", top_k=SEARCH_DEPTH, filters=filters)
+                lists.append([h for h in hits if h.kind == "table"][:TABLES_PER_QUERY])
         order: list[SearchHit] = []
         seen: set[uuid.UUID] = set()
-        for rank in range(HITS_PER_QUERY):  # round-robin: every line item gets its best tables
+        for rank in range(TABLES_PER_QUERY):  # round-robin: every line item gets its best tables
             for hits in lists:
                 if rank < len(hits) and hits[rank].chunk_id not in seen:
                     seen.add(hits[rank].chunk_id)
@@ -229,7 +257,8 @@ class DocumentIntelligenceAgent:
 
     def _facts(self, task: TaskMessage, ctx: AgentContext, usage: Usage, query: str, plan: QuestionPlan,
                picks: CellPicks, tables: dict[str, _Table], companies: list[CompanyView],
-               base: SearchFilters) -> AgentResult:
+               base: SearchFilters, by_code: set[str] | None = None) -> AgentResult:
+        by_code = by_code or set()
         warnings: list[str] = []
         wanted_periods = {p for p in plan.periods if FY.match(p)}
         evidence: list[EvidenceProposal] = []
@@ -283,7 +312,8 @@ class DocumentIntelligenceAgent:
                           "company": t.hit.company_name, "period": period, "value": str(value),
                           "printed": cell["text"], "unit": unit, "currency": currency, "scale": scale,
                           "evidence_id": str(ev.evidence_id), "finding_id": str(finding.finding_id),
-                          "file": t.hit.filename, "page": page})
+                          "file": t.hit.filename, "page": page,
+                          "picked_by": "code" if pick.cell in by_code else "model"})
         not_found = list(dict.fromkeys(picks.not_found))
         if not facts:
             return self._passages(task, ctx, usage, query, companies, base,
@@ -297,7 +327,10 @@ class DocumentIntelligenceAgent:
                      "sources": [f"{f['company']} · {f['file']} p.{f['page']}" for f in facts],
                      "line_items_requested": [m.name for m in plan.metrics], "periods": plan.periods,
                      "kb_version": self._kb.version},
-            warnings=warnings, metrics={**usage.metrics(), "tables": len(tables), "facts": len(facts)})
+            warnings=warnings, metrics={**usage.metrics(), "tables": len(tables), "facts": len(facts),
+                                        "cells_by_code": sum(f["picked_by"] == "code" for f in facts),
+                                        "cells_by_model": sum(f["picked_by"] == "model" for f in facts),
+                                        "cell_resolver": RESOLVER_VERSION})
 
     @staticmethod
     def _quote(t: _Table, row: dict[str, Any], cell: dict[str, Any]) -> str | None:

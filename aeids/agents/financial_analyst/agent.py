@@ -61,6 +61,20 @@ class CalcPlan(_Loose):
     calculations: list[CalcRequest] = Field(default_factory=list, max_length=40)
 
 
+# words that ask for something worked out from reported values (a change, a ratio, a comparison)
+_CALC_WORDS = re.compile(
+    r"%|\b(grow\w*|grew|chang\w*|increas\w*|decreas\w*|declin\w*|rise|rose|risen|fell|fall\w*|drop\w*|"
+    r"margin\w*|ratios?|rates?|percent\w*|share|cagr|compar\w*|versus|vs|differen\w*|gap|higher|lower|"
+    r"more|less|larger|smaller|bigger|per|return|intensity|coverage|turnover|days|average|sum|combined|"
+    r"together|total of|net of|minus|plus|times|multiple|trend)\b", re.I)
+
+
+def needs_calculation(query: str, kb: knowledge.KnowledgeBase) -> bool:
+    """Whether a question asks for more than the reported values (then the model plans the
+    calculations). Conservative: any word of change, ratio or comparison, or a named metric."""
+    return bool(_CALC_WORDS.search(query)) or kb.metric_for(query) is not None
+
+
 def clean_title(title: str) -> str | None:
     """The model's title, unless it carries a number that is not a fiscal year."""
     title = " ".join(title.split())
@@ -102,6 +116,13 @@ class FinancialAnalystAgent:
                 "warnings": ["the question asks for no numbers: the passages found are cited"]})
 
         query = str(task.inputs.get("query") or task.objective)
+        if not task.inputs.get("rework_instructions") and not needs_calculation(query, self._kb):
+            # a plain lookup: the reported values are the answer, no model call (D-030)
+            return AgentResult(**_base(task, self.name), status="completed",
+                               warnings=["the question asks for no calculation; the reported values answer it"],
+                               outputs={"calculations": 0, "kb_metrics": [], "kb_version": self._kb.version,
+                                        "skipped": "no calculation asked for"},
+                               metrics=usage.metrics())
         catalog = knowledge.analysis_catalog(self._kb, [t for f in facts.values()
                                                         for t in (f["label"], f.get("metric", ""))])
         plan = ask_json(self._llm, CalcPlan, self._prompt, self._message(query, facts, catalog, task), usage,
