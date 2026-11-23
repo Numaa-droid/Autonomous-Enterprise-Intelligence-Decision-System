@@ -26,6 +26,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from aeids import calc, knowledge
+from aeids.knowledge.metrics import _norm
 from aeids.agents.base import AgentContext
 from aeids.agents.llm_json import ChatModel, Usage, ask_json, load_prompt, untrusted
 from aeids.agents.stubs import FinancialAnalystStub, _base
@@ -135,19 +136,23 @@ class FinancialAnalystAgent:
         warnings: list[str] = []
         done: set[tuple] = set()
         used_metrics: list[str] = []
+        not_calculated: list[str] = []  # asked for, but refused: said in the report, never left out silently
         for req in plan.metrics:
             produced = self._metric(req, facts, quantities, warnings, done)
             if produced:
                 findings += produced
                 used_metrics.append(req.metric)
+            elif ("metric", req.metric.strip(), tuple(sorted(req.inputs.items()))) not in done:  # not a repeat
+                not_calculated.append(req.title or self._requested_name(req.metric))
         for req in plan.calculations:
             finding = self._calculate(req, facts, quantities, warnings, done)
             if finding is not None:
                 findings.append(finding)
         outputs = {"calculations": sum(1 for f in findings if f.category == "calculation"),
-                   "kb_metrics": list(dict.fromkeys(used_metrics)), "kb_version": self._kb.version}
+                   "kb_metrics": list(dict.fromkeys(used_metrics)), "kb_version": self._kb.version,
+                   "not_calculated": list(dict.fromkeys(not_calculated))}
         if not findings:
-            warnings.append("no calculation was needed or possible; the reported values answer the question")
+            warnings.append("nothing could be calculated from the figures found")
             return AgentResult(**_base(task, self.name), status="completed", warnings=warnings,
                                outputs=outputs, metrics=usage.metrics())
         return AgentResult(**_base(task, self.name), status="completed", findings=findings,
@@ -169,6 +174,18 @@ class FinancialAnalystAgent:
                 + ("\n\nNOTES:\n" + "\n".join(notes) if notes else ""))
 
     # ---- knowledge-base metrics ----
+
+    def _extracted_as(self, fact: dict[str, Any], want: str) -> bool:
+        """A label printed for more than one line item ("Income from operations": revenue in some
+        Ind AS reports, operating income in US GAAP ones) counts as ``want`` only when it is one of
+        ``want``'s own names and Document Intelligence extracted the fact for ``want``."""
+        asked = self._kb.line_item_for(str(fact.get("metric") or ""))
+        label = _norm(str(fact.get("label") or "").rpartition(": ")[2])
+        return asked is not None and asked[0] == want and label in {_norm(n) for n in self._kb.line_items[want].names()}
+
+    def _requested_name(self, key: str) -> str:
+        metric = self._kb.metrics.get(key.strip())
+        return metric.name if metric else key.strip()
 
     def _metric(self, req: MetricRequest, facts: dict[str, dict[str, Any]], quantities: dict[str, Quantity],
                 warnings: list[str], done: set[tuple]) -> list[Finding]:
@@ -195,7 +212,7 @@ class FinancialAnalystAgent:
             if want == knowledge.ANY:
                 continue
             got = self._kb.line_item_for(facts[fid]["label"])
-            if got is None or got[0] != want:
+            if (got is None or got[0] != want) and not self._extracted_as(facts[fid], want):
                 expected = self._kb.line_items[want].name
                 warnings.append(f"{key}: {fid} is \"{facts[fid]['label']}\", not a known name of {expected}; "
                                 f"ignored (add the label to the knowledge base if it is)")

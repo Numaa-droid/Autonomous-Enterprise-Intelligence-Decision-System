@@ -46,7 +46,7 @@ from aeids.db.models import (
     utcnow,
 )
 from aeids.documents import DocumentError
-from aeids.reporting.answer import arrange, check_numbers
+from aeids.reporting.answer import arrange, check_numbers, template_summary
 
 REPORT_SCHEMA_VERSION = "report/1.0"
 RENDERER_VERSION = "md-v1"
@@ -56,6 +56,13 @@ NOTICE = "Decision support only: not a legal, financial or compliance determinat
 class ReportNotReady(DocumentError):
     code = "report_not_ready"
     http_status = 409
+
+
+class ReportRefused(DocumentError):
+    """A report requested for an older workflow failed its check, so none is served."""
+
+    code = "report_check_failed"
+    http_status = 422
 
 
 class ReportCheckFailed(Exception):
@@ -340,9 +347,14 @@ def check(session: Session, wf: Workflow, doc: ReportDoc) -> list[str]:
             problems.append(f"calculation of finding {calc.finding_id} differs from the stored one")
 
     if doc.summary:
-        bad = check_numbers(doc.summary, arrange((wf.report or {}).get("verified_findings", [])), wf.query)
-        if bad:
-            problems.append(f"the summary states unchecked numbers: {', '.join(bad)}")
+        arranged = arrange((wf.report or {}).get("verified_findings", []))
+        if doc.summary_source == "template":  # written by code: must be exactly what code writes from these findings
+            if doc.summary != template_summary(arranged):
+                problems.append("the template summary is not the one code writes from the verified findings")
+        else:  # written by AI: every number in it must be a checked value (D-028)
+            bad = check_numbers(doc.summary, arranged, wf.query)
+            if bad:
+                problems.append(f"the summary states unchecked numbers: {', '.join(bad)}")
     return problems
 
 
@@ -477,7 +489,11 @@ def ensure(session: Session, wf: Workflow) -> Report:
         return row
     if wf.status != "COMPLETED" or not wf.report:
         raise ReportNotReady(f"the workflow is {wf.status}; a report is made when it completes")
-    row = publish(session, wf)
+    try:
+        row = publish(session, wf)
+    except ReportCheckFailed as e:
+        session.rollback()
+        raise ReportRefused(f"the report failed its check and was not stored: {e}") from e
     session.commit()
     return row
 

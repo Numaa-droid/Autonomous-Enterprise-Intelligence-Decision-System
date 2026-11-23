@@ -153,6 +153,84 @@ def test_check_refuses_a_changed_calculation_or_an_unchecked_summary_number(env:
     assert "unchecked numbers: 45.5" in _problems(s, wf, doc, summary="Apple's operating margin was 45.5% in FY2025.")
 
 
+def test_a_passages_answer_with_the_template_summary_completes(env: Env) -> None:
+    """Release 0 review: the template "... in 5 passages ..." was refused as an unchecked number,
+    which failed every answer made only of quotes whose AI summary was withheld."""
+    env.llm.plan = lambda user: {"companies": [{"named": "Apple", "match": "Apple Inc."}], "metrics": [], "periods": []}
+    env.llm.summary = lambda user: {"summary": "Apple relies on 187 suppliers in 12 countries."}  # withheld twice
+    wf = _ask(env, "What supply chain risks does Apple face?")
+    assert wf["status"] == "COMPLETED", wf.get("error")
+    rep = _report(env, wf["id"])
+    c = rep["content"]
+    assert c["passages"] and c["summary_source"] == "template" and re.search(r"\d+ passages?", c["summary"])
+    assert "187" not in env.client.get(f"/api/v1/workflows/{wf['id']}/report.md").text
+
+
+def test_a_refused_calculation_is_a_limitation_not_a_silent_gap(env: Env) -> None:
+    """Release 0 review: a margin the analyst refused used to vanish, and the report said
+    "Complete". Now it is listed and the report is partial."""
+    from tests.test_agents_m4 import facts_in
+
+    def wrong_binding(user: str) -> dict:
+        ids = {(f["label"], f["period"]): f["id"] for f in facts_in(user)}
+        sales = ids[("Total net sales", "FY2025")]
+        return {"metrics": [{"metric": "operating_margin", "title": "Apple operating margin, FY2025",
+                             "inputs": {"operating_income": sales, "revenue": sales}}]}
+    env.llm.calcs = wrong_binding
+    wf = _ask(env)
+    rep = _report(env, wf["id"])
+    assert rep["status"] == "partial"
+    assert "Could not be calculated from the verified figures: Apple operating margin, FY2025" in rep["content"]["limitations"]
+
+
+def test_an_ambiguous_label_counts_for_the_line_item_it_was_extracted_for(env: Env) -> None:
+    """Release 0 review: Tesla prints "Income from operations" (also an Ind AS name for revenue);
+    picked as operating income, its margin was refused. It now counts when it was extracted for
+    operating income, and only then."""
+    from aeids.agents.financial_analyst.agent import MetricRequest
+    from aeids.contracts import Quantity
+
+    fa = env.state.registry.get("financial_analyst")
+    facts = {"F1": {"fact_id": "F1", "metric": "Operating income", "label": "Income from operations",
+                    "company": "Tesla, Inc.", "period": "FY2025", "value": "4355", "printed": "4,355",
+                    "unit": "currency", "currency": "USD", "scale": "million", "evidence_id": str(uuid.uuid4())},
+             "F2": {"fact_id": "F2", "metric": "Total revenue", "label": "Total revenues",
+                    "company": "Tesla, Inc.", "period": "FY2025", "value": "94827", "printed": "94,827",
+                    "unit": "currency", "currency": "USD", "scale": "million", "evidence_id": str(uuid.uuid4())}}
+    q = {k: Quantity(value=f["value"], unit="currency", currency="USD", scale="million", period="FY2025",
+                     evidence_id=uuid.UUID(f["evidence_id"])) for k, f in facts.items()}
+    req = MetricRequest(metric="operating_margin", inputs={"operating_income": "F1", "revenue": "F2"})
+    warnings: list[str] = []
+    found = fa._metric(req, facts, q, warnings, set())
+    assert found and found[-1].value.quantize(Decimal("0.01")) == Decimal("4.59"), warnings
+    facts["F1"]["metric"] = "Total revenue"  # the same label, extracted as revenue: not operating income
+    warnings = []
+    assert fa._metric(req, facts, q, warnings, set()) == [] and "not a known name of Operating income" in warnings[0]
+
+
+def test_check_holds_a_template_summary_to_what_code_writes(env: Env) -> None:
+    s, wf, doc = _built(env)
+    from aeids.reporting.answer import arrange, template_summary
+
+    exact = template_summary(arrange(wf.report["verified_findings"]))
+    assert _problems(s, wf, doc, summary=exact, summary_source="template") == ""
+    assert "template summary is not the one code writes" in _problems(
+        s, wf, doc, summary=exact + " Margins will rise.", summary_source="template")
+
+
+def test_an_older_workflow_whose_report_fails_the_check_gets_a_clear_error(env: Env) -> None:
+    wf_id = _ask(env)["id"]
+    s = env.sessions()
+    s.execute(delete(Report).where(Report.workflow_id == uuid.UUID(wf_id)))
+    wf = s.get(Workflow, uuid.UUID(wf_id))
+    wf.report = {**wf.report, "summary": "Margins were 45.5%.", "summary_source": "ai"}
+    s.commit()
+    for path in ("report", "report.md"):
+        resp = env.client.get(f"/api/v1/workflows/{wf_id}/{path}")
+        assert resp.status_code == 422 and "unchecked numbers: 45.5" in resp.text, resp.text
+    assert s.scalar(select(Report).where(Report.workflow_id == uuid.UUID(wf_id))) is None
+
+
 def test_a_report_that_fails_its_check_fails_the_workflow(env: Env, monkeypatch) -> None:
     monkeypatch.setattr(R, "check", lambda session, wf, doc: ["the summary states unchecked numbers: 7"])
     wf = _ask(env)

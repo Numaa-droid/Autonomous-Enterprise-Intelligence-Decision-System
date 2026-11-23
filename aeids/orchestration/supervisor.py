@@ -601,6 +601,11 @@ def build_report(session: Session, wf: Workflow, tasks: list[AgentTask]) -> dict
     not_found = [m for t in tasks if t.id not in superseded for m in (t.output_json or {}).get("not_found") or []]
     if not_found:  # values the agents looked for and did not find: said, never estimated
         limitations.append("Not found in the reports: " + ", ".join(dict.fromkeys(not_found)))
+    not_calculated = [m for t in tasks if t.id not in superseded and t.status == T.VERIFIED.value
+                      for m in (t.output_json or {}).get("not_calculated") or []]
+    if not_calculated:  # asked for, but the figures found did not allow it: said, never left out silently
+        limitations.append("Could not be calculated from the verified figures: "
+                           + ", ".join(dict.fromkeys(not_calculated)))
     live = [t.id for t in tasks if t.id not in superseded and t.agent_name != VERIFICATION_AGENT]
     for f in session.scalars(select(FindingRecord).where(
             FindingRecord.workflow_id == wf.id, FindingRecord.task_id.in_(live),
