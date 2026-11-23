@@ -20,6 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from aeids.agents.document_intelligence import DocumentIntelligenceAgent
+from aeids.agents.document_intelligence.agent import is_company
 from aeids.agents.financial_analyst import FinancialAnalystAgent
 from aeids.agents.financial_analyst.agent import clean_title
 from aeids.agents.llm_json import extract_json, untrusted
@@ -259,6 +260,28 @@ def test_a_match_outside_the_uploaded_companies_is_refused(env: Env) -> None:
                                  "metrics": [{"name": "Revenue", "search_query": "revenue"}], "periods": []}
     wf = _ask(env, "What was Tesla's revenue?")
     assert wf["tasks_by_key"]["extract"]["status"] == "NEEDS_HUMAN_REVIEW" and not wf["findings"]
+
+
+def test_a_risk_question_about_a_company_without_a_report_is_refused(env: Env) -> None:
+    """Passage answers too: never quote another company's report (D-036)."""
+    env.llm.plan = lambda user: {"companies": [{"named": "NVIDIA", "match": None}], "metrics": [], "periods": []}
+    wf = _ask(env, "What risks does NVIDIA face from US export controls?")
+    extract = wf["tasks_by_key"]["extract"]
+    assert extract["status"] == "NEEDS_HUMAN_REVIEW" and "NVIDIA" in extract["last_error"]
+    assert not wf["findings"]
+
+
+def test_a_country_or_regulator_is_not_a_missing_company(env: Env) -> None:
+    env.llm.plan = lambda user: {"companies": [{"named": "U.S.", "match": None}, {"named": "the SEC", "match": None}],
+                                 "metrics": [], "periods": []}
+    wf = _ask(env, "What are the risks from U.S. export controls and SEC rules?")
+    assert wf["status"] == "COMPLETED" and wf["findings"]
+    assert all(f["value"] is None for f in wf["findings"])
+
+
+def test_is_company() -> None:
+    assert not any(is_company(n) for n in ("US", "U.S.", "the United States", "China", "EU", "SEC"))
+    assert all(is_company(n) for n in ("NVIDIA", "Apple", "Tesla, Inc.", "US Steel", "Bank of America"))
 
 
 def model_picks(e: Env) -> None:

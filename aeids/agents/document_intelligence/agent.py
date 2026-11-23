@@ -118,6 +118,25 @@ def _units_text(unit: str, currency: str | None, scale: str | None) -> str:
     return " ".join(p for p in parts if p)
 
 
+# Places and public bodies the planner sometimes lists as companies ("risks from US export controls").
+# They are never a missing report; a company without an uploaded report is still refused (D-036).
+NOT_COMPANIES = frozenset({
+    "us", "usa", "united states", "united states of america", "america", "uk", "united kingdom", "britain",
+    "eu", "european union", "europe", "asia", "china", "prc", "india", "japan", "taiwan", "korea",
+    "south korea", "germany", "france", "canada", "mexico", "russia", "ukraine", "brazil", "hong kong",
+    "singapore", "israel", "ireland", "netherlands", "switzerland", "australia", "middle east",
+    "government", "us government", "federal government", "congress", "white house", "sec", "irs", "ftc",
+    "doj", "fda", "epa", "federal reserve", "fed", "department of commerce", "commerce department", "bis",
+    "sebi", "rbi", "mca", "opec", "wto", "un", "united nations",
+})
+
+
+def is_company(named: str) -> bool:
+    """False for a country, region, government or regulator the planner listed as a company."""
+    key = re.sub(r"[^a-z ]", "", named.casefold().replace(".", "")).strip()
+    return re.sub(r"^the ", "", key) not in NOT_COMPANIES
+
+
 def _no_esg_source(companies: list[str]) -> str:
     """Why an ESG question cannot be answered: only annual reports (without a BRSR section) (D-035)."""
     names = ", ".join(dict.fromkeys(companies)) or "the companies asked about"
@@ -159,6 +178,7 @@ class DocumentIntelligenceAgent:
 
         plan = ask_json(self._llm, QuestionPlan, self._plan_prompt,
                         self._plan_message(query, available, task), usage, model=self.model)
+        plan = plan.model_copy(update={"companies": [m for m in plan.companies if is_company(m.named)]})
         by_name = {c.name: c for c in available}
         missing = [m.named for m in plan.companies if not m.match or m.match not in by_name]
         if missing:

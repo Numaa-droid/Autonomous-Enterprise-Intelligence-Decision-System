@@ -53,6 +53,13 @@ Record each design or library choice in a few lines: what was chosen, what else 
 
 ## Accepted decisions
 
+### D-036 — Countries and regulators are not companies; a company without a report is refused for quote answers too
+- Date: 2026-11-24
+- Status: accepted
+- Decision: Document Intelligence drops planner company entries that are a country, region, government or regulator (`NOT_COMPANIES`, `is_company` in `aeids/agents/document_intelligence/agent.py`: US, China, EU, SEC, SEBI, …) before the "no report has been uploaded for X" check. A real company without an uploaded report is still refused, for number and passage (quote) answers alike; tests cover both.
+- Why: with only Tesla uploaded, the live planner listed "US" in "what are the risks from US export controls?" as a company with no report and the question was refused. The NVIDIA risk question that was answered from Tesla's report (2026-11-20) ran on the M3 stand-in agent (`0.1-stub`), which has no model and cannot recognise company names; the LLM agent refuses it.
+- Consequences / follow-ups: the stand-in agents (used only when no OpenRouter key is set, `AEIDS_AGENT_MODE=auto`) still cannot refuse companies they do not know. The list is code, not the prompt, so the benchmark prompts are unchanged.
+
 ### D-035 — Document type is checked on upload; ESG questions need an ESG source
 - Date: 2026-11-24
 - Status: accepted

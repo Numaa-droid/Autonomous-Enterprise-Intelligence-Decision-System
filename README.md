@@ -341,6 +341,7 @@ AEIDS is about 2 s slower and calculates and compares reliably, and every number
 > **New in M7:** every completed question gets a stored, checked report (JSON and Markdown): the answer, every calculation with its inputs, numbered sources down to the page and evidence record, limitations, review status and how it was made. Before it is stored, code checks that it contains every verified finding and nothing else. A report that fails the check is not stored, and the workflow fails instead. Download it from the answer page, `GET /api/v1/workflows/{id}/report.md`, or `python -m aeids.reporting <id>`.
 > **Since the Release 0 review:**
 > - checks you can trust: an upload must be the type it says it is, and ESG questions are answered only from ESG reports or BRSRs (D-035);
+> - a question about a company with no uploaded report is refused, for quoted answers too; countries and regulators ("US export controls") are not mistaken for companies (D-036);
 > - a local-only API guard and safer secrets (D-034);
 > - earnings per share in the knowledge base (D-033);
 > - a simpler console: mint and amber, a hideable history panel, illustrations.
