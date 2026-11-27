@@ -17,6 +17,7 @@ response to the page.
 
 from __future__ import annotations
 
+import hmac
 import json
 from collections.abc import Awaitable, Callable, Iterable
 from typing import Any
@@ -70,6 +71,7 @@ READ_ONLY_ALLOWED = {
     ("POST", "/api/v1/dashboard/search"),
     ("POST", "/api/v1/dashboard/workflows"),
 }
+OWNER_HEADER = "x-aeids-owner-key"
 READ_ONLY_MESSAGE = ("This is a read-only demo: uploading, deleting and reviewing are turned off. "
                      "You can still browse the reports, search them and ask questions.")
 
@@ -77,19 +79,37 @@ READ_ONLY_MESSAGE = ("This is a read-only demo: uploading, deleting and reviewin
 class ReadOnlyGuard:
     """``AEIDS_READ_ONLY=true`` (public demo, D-039): every POST, PUT, PATCH or DELETE is refused
     (403) unless it is in ``READ_ONLY_ALLOWED``. An allow-list, so an endpoint added later is
-    read-only until it is listed here."""
+    read-only until it is listed here. A request with the owner key (``AEIDS_OWNER_KEY``, header
+    ``X-AEIDS-Owner-Key``) passes: the owner edits without opening the demo to visitors (D-040)."""
 
-    def __init__(self, app: Callable[[Scope, Receive, Send], Awaitable[None]]) -> None:
+    def __init__(self, app: Callable[[Scope, Receive, Send], Awaitable[None]],
+                 owner_key: Any = None) -> None:
         self.app = app
+        self.owner_key = owner_key
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] == "http":
             method = scope.get("method", "GET").upper()
             path = scope.get("path", "").rstrip("/") or "/"
-            if method in UNSAFE_METHODS and (method, path) not in READ_ONLY_ALLOWED:
+            if (method in UNSAFE_METHODS and (method, path) not in READ_ONLY_ALLOWED
+                    and not is_owner(_header(scope, OWNER_HEADER), self.owner_key)):
                 await _refuse(scope, send, 403, "read_only", READ_ONLY_MESSAGE)
                 return
         await self.app(scope, receive, send)
+
+
+def is_owner(presented: str | None, owner_key: Any) -> bool:
+    """True when ``presented`` is the owner key (a SecretStr); constant-time comparison."""
+    if not presented or owner_key is None:
+        return False
+    return hmac.compare_digest(presented.strip().encode(), owner_key.get_secret_value().encode())
+
+
+def _header(scope: Scope, name: str) -> str | None:
+    for k, v in scope.get("headers", []):
+        if k.decode("latin-1").lower() == name:
+            return v.decode("latin-1")
+    return None
 
 
 async def _refuse(scope: Scope, send: Send, status: int, code: str, message: str) -> None:

@@ -53,6 +53,14 @@ Record each design or library choice in a few lines: what was chosen, what else 
 
 ## Accepted decisions
 
+### D-040 — Owner key for the read-only demo
+- Date: 2026-11-27
+- Status: accepted
+- Decision: `AEIDS_OWNER_KEY` (optional, at least 16 characters, `SecretStr`, never printed). In a read-only demo (D-039) a request whose `X-AEIDS-Owner-Key` header equals it (constant-time comparison, `aeids.api.security.is_owner`) passes `ReadOnlyGuard`. `/dashboard/tenants` reports `can_edit` and `owner_unlock`; the console's Reports page offers **Owner? Unlock editing** (password field), keeps the key in `sessionStorage` for that tab only, sends it with every request (fetch and upload), shows an **Owner mode** bar with **Lock**, and forgets a key the server does not accept.
+- Alternatives considered: switching `AEIDS_READ_ONLY` off to upload (opens the demo to every visitor meanwhile, and needs a restart); user accounts and login (out of Release 0 scope).
+- Why: the owner must be able to add and remove reports in the public demo without opening it to visitors.
+- Consequences / follow-ups: the key is a shared secret sent on every request over HTTPS; anyone who has it can change data, so keep it private and rotate it in Render if it leaks. No rate limit on wrong keys (16+ random characters cannot be guessed online).
+
 ### D-039 — Read-only demo mode
 - Date: 2026-11-27
 - Status: accepted

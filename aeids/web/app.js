@@ -6,6 +6,13 @@
 const API = "/api/v1/dashboard";
 const $ = (sel, root = document) => root.querySelector(sel);
 const state = { tenant: null, defaultTenant: "default", tenants: [], timer: null, pageTimer: null, current: null, models: {} };
+// owner key (D-040): kept for this browser tab only, sent with every request
+const OWNER_KEY = "aeids-owner-key";
+try { state.ownerKey = sessionStorage.getItem(OWNER_KEY) || null; } catch (e) { state.ownerKey = null; }
+function setOwnerKey(k) {
+  state.ownerKey = k || null;
+  try { if (k) sessionStorage.setItem(OWNER_KEY, k); else sessionStorage.removeItem(OWNER_KEY); } catch (e) { /* storage blocked */ }
+}
 
 /* ---------------- icons (constant markup only) ---------------- */
 const P = {
@@ -237,6 +244,7 @@ function errorText(body, status) {
   return typeof msg === "string" ? msg : JSON.stringify(msg);
 }
 async function api(path, opts) {
+  if (state.ownerKey) opts = { ...(opts || {}), headers: { ...((opts || {}).headers || {}), "X-AEIDS-Owner-Key": state.ownerKey } };
   const res = await fetch(path.startsWith("/api/") ? path : API + path, opts); // dashboard paths are relative
   let body = null;
   try { body = await res.json(); } catch (e) { /* not JSON */ }
@@ -614,10 +622,37 @@ function notice(kind, ...text) {
   const ic = { good: "check", critical: "x", warning: "alert", info: "clock" }[kind] || "clock";
   return el("div", { class: `notice ${kind}`, role: kind === "critical" ? "alert" : "status" }, icon(ic), el("div", {}, ...text));
 }
+function demoNote() {
+  const parts = [notice("info", el("b", {}, "Read-only demo. "),
+    "Uploading and deleting reports are turned off here. Pick a report on the left to see it, or use Ask to question the reports already loaded.")];
+  if (state.ownerUnlock) {
+    const key = el("input", { class: "input", type: "password", placeholder: "Owner key", autocomplete: "current-password",
+      "aria-label": "Owner key", style: { maxWidth: "280px" } });
+    const unlock = async () => {
+      if (!key.value.trim()) return;
+      setOwnerKey(key.value.trim());
+      await loadTenants(state.tenant);
+      if (!state.isOwner) { setOwnerKey(null); await loadTenants(state.tenant); toast("That owner key was not accepted."); return; }
+      render();
+    };
+    key.addEventListener("keydown", (e) => { if (e.key === "Enter") unlock(); });
+    parts.push(el("details", { class: "small", style: { marginTop: "10px" } }, el("summary", {}, "Owner? Unlock editing"),
+      el("div", { style: { display: "flex", gap: "8px", marginTop: "8px", flexWrap: "wrap" } }, key,
+        el("button", { class: "btn", type: "button", onclick: unlock }, "Unlock"))));
+  }
+  return el("div", { class: "card fade-in" }, ...parts);
+}
+function ownerBar() {
+  const lock = async () => { setOwnerKey(null); await loadTenants(state.tenant); render(); };
+  return el("div", { class: "card fade-in" }, notice("good", el("b", {}, "Owner mode. "),
+    "Editing is unlocked in this browser tab only; visitors still see a read-only demo. ",
+    el("button", { class: "btn", type: "button", onclick: lock, style: { marginLeft: "6px" } }, "Lock")));
+}
 function uploadWithProgress(url, form, onProgress) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", url);
+    if (state.ownerKey) xhr.setRequestHeader("X-AEIDS-Owner-Key", state.ownerKey);
     xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(e.loaded / e.total); };
     xhr.onload = () => {
       let body = null;
@@ -792,10 +827,8 @@ async function viewDocuments(root, selected) {
     try { docs = await api(`/documents?${tq()}`); if (state.side) { state.side.docs = docs; drawSidebar(); } }
     catch (e) { if (/no tenant/i.test(e.message)) docs = []; else throw e; }
     if (!panelShown) {
-      root.prepend(state.readOnly
-        ? el("div", { class: "card fade-in" }, notice("info", el("b", {}, "Read-only demo. "),
-            "Uploading and deleting reports are turned off here. Pick a report on the left to see it, or use Ask to question the reports already loaded."))
-        : uploadPanel([...new Set(docs.map((d) => d.company))], afterUpload));
+      root.prepend(...[state.isOwner ? ownerBar() : null,
+        state.readOnly ? demoNote() : uploadPanel([...new Set(docs.map((d) => d.company))], afterUpload)].filter(Boolean));
       panelShown = true;
     }
     drawList();
@@ -823,7 +856,8 @@ async function viewDocuments(root, selected) {
       const ready = docs.filter((d) => d.versions.some((v) => v.is_current && v.status === "indexed")).length;
       list.replaceChildren(el("div", { class: "card pick-card fade-in" }, ill("pick"),
         el("div", {}, el("h3", {}, selected ? "This report is not in this workspace" : `All ${ready} report${ready === 1 ? " is" : "s are"} ready`),
-          el("p", {}, "Pick a report in the panel on the left to see its details, or upload another one above."))));
+          el("p", {}, state.readOnly ? "Pick a report in the panel on the left to see its details, or use Ask to question it."
+            : "Pick a report in the panel on the left to see its details, or upload another one above."))));
       return;
     }
     const companies = [...new Set(docs.map((d) => d.company))];
@@ -1541,7 +1575,10 @@ async function loadTenants(select) {
   try {
     const t = await api("/tenants");
     state.defaultTenant = t.default;
-    state.readOnly = !!t.read_only; // public demo (D-039): no uploads, deletes or reviews
+    // public demo (D-039): no uploads, deletes or reviews, unless this tab holds the owner key (D-040)
+    state.readOnly = !!t.read_only && !t.can_edit;
+    state.isOwner = !!t.read_only && !!t.can_edit;
+    state.ownerUnlock = !!t.owner_unlock;
     if (t.models) $("#model-chip").replaceChildren(`AI models: ${t.models.llm} (answers), ${t.models.embedding} (search)`);
     const names = t.tenants.includes(t.default) ? t.tenants : [t.default, ...t.tenants]; // own tenant always listed
     state.tenants = names;

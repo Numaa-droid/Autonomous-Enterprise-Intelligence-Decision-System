@@ -6,7 +6,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_QUERY_INSTRUCTION = (
@@ -27,6 +27,18 @@ class Settings(BaseSettings):
     allowed_hosts: list[str] = Field(default_factory=lambda: ["127.0.0.1", "localhost", "::1"], min_length=1)
     # public demo (D-039): refuse every change except searching and asking questions
     read_only: bool = False
+    # owner key (D-040): a request carrying it (header X-AEIDS-Owner-Key) may still change data in
+    # a read-only demo. At least 16 characters; never printed.
+    owner_key: SecretStr | None = Field(default=None, repr=False)
+
+    @field_validator("owner_key")
+    @classmethod
+    def _owner_key_strong(cls, v: SecretStr | None) -> SecretStr | None:
+        if v is None or not v.get_secret_value().strip():
+            return None  # empty means no owner key
+        if len(v.get_secret_value().strip()) < 16:
+            raise ValueError("AEIDS_OWNER_KEY must be at least 16 characters")
+        return SecretStr(v.get_secret_value().strip())
     storage_root: Path = Path("./storage")
     max_upload_bytes: int = Field(default=100 * 1024 * 1024, gt=0)
     # TableLens _structure.json files grow to tens of MB on long reports

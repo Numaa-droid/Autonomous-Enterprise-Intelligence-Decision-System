@@ -382,6 +382,7 @@ Then open **http://127.0.0.1:8001/ui**: ask a question on **Ask**, upload a repo
 > [!WARNING]
 > The console has no login. Keep the API bound to `127.0.0.1`. The API also answers only requests addressed to this machine (`AEIDS_ALLOWED_HOSTS`) and refuses changes requested from another website, so a web page you visit cannot read your documents or spend your OpenRouter key (D-034). Keep `.env` private (`chmod 600 .env`), give the database a strong password, and set a spending limit on your OpenRouter key.
 > For a public demo, set `AEIDS_READ_ONLY=true`: visitors can browse reports, search and ask questions, but uploading, deleting, re-processing and reviewing are refused (403) and hidden in the console (D-039). Questions still use your OpenRouter key, so keep its spending limit.
+> To keep editing it yourself, also set `AEIDS_OWNER_KEY` (16+ random characters): on the Reports page open **Owner? Unlock editing** and enter it. Only that browser tab can then upload and delete; visitors still see the read-only demo, and **Lock** ends it (D-040).
 
 <details>
 <summary><b>FAQ</b></summary>

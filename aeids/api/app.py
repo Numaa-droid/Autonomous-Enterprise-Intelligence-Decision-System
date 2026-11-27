@@ -46,7 +46,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.add_middleware(LocalOnlyGuard, allowed_hosts=settings.allowed_hosts)  # D-034
     if settings.read_only:  # public demo: only search and questions (D-039)
-        app.add_middleware(ReadOnlyGuard)
+        app.add_middleware(ReadOnlyGuard, owner_key=settings.owner_key)  # owner edits (D-040)
     app.state.settings = settings
     app.state.engine = engine
     app.state.sessionmaker = make_sessionmaker(engine)

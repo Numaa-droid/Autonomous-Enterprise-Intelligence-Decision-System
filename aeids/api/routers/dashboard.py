@@ -39,6 +39,7 @@ from aeids.db.models import (
     Tenant,
     TraceSpan,
 )
+from aeids.api.security import OWNER_HEADER, is_owner
 from aeids.documents import DocumentError
 from aeids.retrieval.search import SearchFilters, search
 
@@ -109,11 +110,15 @@ def _pct(values: list[float], p: int) -> float:
 # --- overview -------------------------------------------------------------------
 
 @router.get("/tenants")
-def tenants(session: SessionDep, settings: SettingsDep) -> dict[str, Any]:
+def tenants(request: Request, session: SessionDep, settings: SettingsDep) -> dict[str, Any]:
     names = list(session.scalars(select(Tenant.name).order_by(Tenant.name)))
     return {"default": settings.default_tenant_name, "tenants": names,
             "models": {"embedding": settings.embedding_model, "llm": settings.llm_model},
-            "read_only": settings.read_only}
+            "read_only": settings.read_only,
+            # D-040: may this browser change data (no demo, or the owner key sent)?
+            "can_edit": not settings.read_only
+            or is_owner(request.headers.get(OWNER_HEADER), settings.owner_key),
+            "owner_unlock": settings.read_only and settings.owner_key is not None}
 
 
 @router.get("/overview")
