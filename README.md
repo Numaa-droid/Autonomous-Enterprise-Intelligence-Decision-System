@@ -8,7 +8,8 @@
   <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-source%20of%20truth-8b5cf6?style=flat-square">
   <img alt="Qdrant" src="https://img.shields.io/badge/Qdrant-hybrid%20search-2dd4bf?style=flat-square">
   <img alt="Agents" src="https://img.shields.io/badge/agents-Supervisor%20%C2%B7%20Analyst%20%C2%B7%20Verifier-a78bfa?style=flat-square">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-550%2B%20passing-22c55e?style=flat-square">
+  <a href="https://github.com/Numaa-droid/Autonomous-Enterprise-Intelligence-Decision-System/actions/workflows/tests.yml"><img alt="Tests" src="https://github.com/Numaa-droid/Autonomous-Enterprise-Intelligence-Decision-System/actions/workflows/tests.yml/badge.svg?branch=main"></a>
+  <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-64748b?style=flat-square">
 </p>
 
 <p align="center">
@@ -39,9 +40,9 @@ What you get back is not a paragraph you have to take on trust. Each claim links
 - **Verified before it is reported:** every calculation is replayed and every value checked against its table cell (page, unit, scale, currency, period); wrong findings get at most two rework rounds.
 - **Hybrid retrieval:** Qdrant dense search plus PostgreSQL full-text search, fused with reciprocal rank fusion; the right page is in the top 10 for 90% of benchmark questions.
 - **Measured against a baseline:** on 37 questions over five companies' 10-Ks, 89–92% correct vs 68–69% for a single-prompt RAG baseline, and 0% unsupported numbers vs 12–14%, at a median under 5 s and under USD 0.001 per question.
-- **Engineering:** Python 3.11, FastAPI, Pydantic v2, SQLAlchemy and Alembic, Redis/RQ workers with leases, run tracing and a web console, 550+ tests.
+- **Engineering:** Python 3.11, FastAPI, Pydantic v2, SQLAlchemy and Alembic, Redis/RQ workers with leases, run tracing and a web console, 550+ tests run on [GitHub Actions](https://github.com/Numaa-droid/Autonomous-Enterprise-Intelligence-Decision-System/actions/workflows/tests.yml) against SQLite and PostgreSQL.
 
-Built by **Saurabh Kadam** · [LinkedIn](https://www.linkedin.com/in/saurabh-kadam6998/) · [Portfolio](https://saurabh-portfolio-blush.vercel.app/) · [GitHub](https://github.com/Numaa-droid)
+Built by **Saurabh Kadam** · MIT [license](LICENSE) · [LinkedIn](https://www.linkedin.com/in/saurabh-kadam6998/) · [Portfolio](https://saurabh-portfolio-blush.vercel.app/) · [GitHub](https://github.com/Numaa-droid)
 
 ---
 

@@ -53,6 +53,14 @@ Record each design or library choice in a few lines: what was chosen, what else 
 
 ## Accepted decisions
 
+### D-041 — MIT license and tests on GitHub Actions
+- Date: 2026-11-27
+- Status: accepted
+- Decision: the repository is MIT-licensed (`LICENSE`, copyright Saurabh Kadam). `.github/workflows/tests.yml` runs `pytest` on every push to `main` and every pull request, in two jobs: SQLite, and PostgreSQL 18 as a service container (`AEIDS_TEST_DATABASE_URL`). No secrets: tests never call the network, and the tests that need locally parsed reports skip themselves. The README's tests badge shows the live result.
+- Alternatives considered: no license (all rights reserved, which discourages reuse); a fixed "tests passing" badge (cannot show a failure).
+- Why: the repository is public and linked from a resume; a license and a visible, real test status tell readers they may reuse the code and that the suite passes.
+- Consequences / follow-ups: TableLens (`tablelens/`) and its models keep their own third-party licenses (Table Transformer, docling, PaddleOCR). A fresh clone passed locally (551 passed, 6 skipped) before the workflow was added.
+
 ### D-040 — Owner key for the read-only demo
 - Date: 2026-11-27
 - Status: accepted

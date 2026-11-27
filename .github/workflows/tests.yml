@@ -1,0 +1,55 @@
+# Runs the test suite on every push to main and every pull request (D-041).
+# No secrets are needed: tests never call the network (fake model transport, HashEmbedder,
+# in-memory Qdrant, fake TableLens). Tests that need locally parsed reports skip themselves.
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sqlite:
+    name: pytest (SQLite)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Install dependencies (Python 3.11)
+        run: uv venv --python 3.11 .venv && uv pip install --python .venv/bin/python -r requirements.txt
+      - name: Run tests
+        run: .venv/bin/pytest -q
+
+  postgres:
+    name: pytest (PostgreSQL 18)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: aeids
+          POSTGRES_PASSWORD: ci-only-throwaway  # a disposable database that exists only for this job
+          POSTGRES_DB: aeids_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U aeids -d aeids_test"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      AEIDS_TEST_DATABASE_URL: postgresql+psycopg://aeids:ci-only-throwaway@127.0.0.1:5432/aeids_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Install dependencies (Python 3.11)
+        run: uv venv --python 3.11 .venv && uv pip install --python .venv/bin/python -r requirements.txt
+      - name: Run tests against PostgreSQL
+        run: .venv/bin/pytest -q
