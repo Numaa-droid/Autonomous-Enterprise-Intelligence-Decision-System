@@ -8,10 +8,11 @@
   <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-source%20of%20truth-8b5cf6?style=flat-square">
   <img alt="Qdrant" src="https://img.shields.io/badge/Qdrant-hybrid%20search-2dd4bf?style=flat-square">
   <img alt="Agents" src="https://img.shields.io/badge/agents-Supervisor%20%C2%B7%20Analyst%20%C2%B7%20Verifier-a78bfa?style=flat-square">
-  <img alt="Status" src="https://img.shields.io/badge/Release%200-M1%E2%80%93M7%20done-22c55e?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-550%2B%20passing-22c55e?style=flat-square">
 </p>
 
 <p align="center">
+  <a href="https://aeids-api.onrender.com/ui/"><img alt="Live demo" src="https://img.shields.io/badge/%E2%96%B6-Live%20demo-ef4444?style=for-the-badge"></a>
   <a href="#understanding-the-project"><img alt="1 Understand" src="https://img.shields.io/badge/1-Understand-8b5cf6?style=for-the-badge"></a>
   <a href="#how-it-works"><img alt="2 How it works" src="https://img.shields.io/badge/2-How%20it%20works-6366f1?style=for-the-badge"></a>
   <a href="#the-agent-team"><img alt="3 Agents" src="https://img.shields.io/badge/3-Agents-22d3ee?style=for-the-badge"></a>
@@ -25,8 +26,22 @@ Ask a hard question about a company's annual report, for example *"How dependent
 
 What you get back is not a paragraph you have to take on trust. Each claim links to the exact **page, section and quote** it came from, and every number is computed by **tested code, not by the language model**, so anyone can recompute it.
 
+> [!TIP]
+> **[Try the live demo](https://aeids-api.onrender.com/ui/)**: a read-only copy with Apple's FY2025 10-K loaded. On **Ask**, try *"Compare Apple's revenue and operating margin FY2023–FY2025"* or *"What was Apple's net profit margin in fiscal 2025?"*, then open **How AEIDS got this answer** to see the plan, the checks and the cited pages. It runs on a free server that sleeps when idle, so the first load can take about a minute.
+
 > [!NOTE]
 > AEIDS is **decision support**. It does not make final legal, financial or compliance determinations.
+
+### At a glance
+
+- **Multi-agent orchestration:** a Supervisor splits each question into typed tasks for Document Intelligence, Financial Analyst and Verification agents. Tasks and workflows are state machines persisted in PostgreSQL, so a workflow resumes after a crash without redoing finished work.
+- **No LLM arithmetic:** the model picks table cells and metric recipes; a tested calculation module computes every number and stores its formula and inputs.
+- **Verified before it is reported:** every calculation is replayed and every value checked against its table cell (page, unit, scale, currency, period); wrong findings get at most two rework rounds.
+- **Hybrid retrieval:** Qdrant dense search plus PostgreSQL full-text search, fused with reciprocal rank fusion; the right page is in the top 10 for 90% of benchmark questions.
+- **Measured against a baseline:** on 37 questions over five companies' 10-Ks, 89–92% correct vs 68–69% for a single-prompt RAG baseline, and 0% unsupported numbers vs 12–14%, at a median under 5 s and under USD 0.001 per question.
+- **Engineering:** Python 3.11, FastAPI, Pydantic v2, SQLAlchemy and Alembic, Redis/RQ workers with leases, run tracing and a web console, 550+ tests.
+
+Built by **Saurabh Kadam** · [LinkedIn](https://www.linkedin.com/in/saurabh-kadam6998/) · [Portfolio](https://saurabh-portfolio-blush.vercel.app/) · [GitHub](https://github.com/Numaa-droid)
 
 ---
 
@@ -310,7 +325,7 @@ Every answer depends on finding the right page first, so it is measured. Combini
 
 ### Does AEIDS beat one RAG prompt?
 
-The same 37 questions go to AEIDS and to a single-agent baseline: the same search, the same model, one prompt that answers with citations. Both are scored the same way: the right numbers stated, cited pages that hold them, and no number the cited pages do not print (D-029).
+The same 37 questions go to AEIDS and to a single-agent baseline: the same search, the same model, one prompt that answers with citations. Both are scored the same way: the right numbers stated, cited pages that hold them, and no number the cited pages do not print (D-029). The table shows one run; across runs AEIDS scored 89–92% and the baseline 68–69%, with 0% vs 12–14% unsupported numbers.
 
 | | AEIDS | Baseline (one RAG prompt) |
 |---|---:|---:|
@@ -326,26 +341,18 @@ The same 37 questions go to AEIDS and to a single-agent baseline: the same searc
 
 Across the runs in and after the [Release 0 review](docs/RELEASE_0_REVIEW.md), AEIDS scored 89–92%. The misses that vary between runs come from a model choice: how the planner reads a question, or how the analyst wires a calculation's inputs. When the analyst wires them wrongly, the calculation is refused and the report says so. Three results held in every run: 0% unchecked numbers, 100% on comparisons, and no errors. The three lookups AEIDS always misses are headcounts printed only in prose.
 
-AEIDS is about 2 s slower and calculates and compares reliably, and every number it states is checked. Code reads values the tables already hold and the model is asked only when a match is unclear, which cut time per question from 22 s to under 5 s and tokens by half (D-030). Its three misses are headcounts printed only in prose. [Run it yourself](#end-to-end-benchmark).
+AEIDS is about 2 s slower and calculates and compares reliably, and every number it states is checked. Code reads values the tables already hold and the model is asked only when a match is unclear, which cut time per question from 22 s to under 5 s and tokens by half (D-030). [Run it yourself](#end-to-end-benchmark).
 
 ---
 
 ## Status
 
 > [!IMPORTANT]
-> **What works today:** uploading reports, versioning, automatic parsing, hybrid search, the Supervisor and its task plan, crash-safe workers, citation verification, tracing and the web console.
-> **New in M4:** Document Intelligence reads reported values from the parsed tables, and the Financial Analyst calculates margins and growth with the calculation module. For example, *"Compare Apple's revenue and operating margin FY2023–FY2025"* on Apple's 10-K gives 6 reported values (page 32) and 5 calculations (operating margin 29.82% → 31.51% → 31.97%), all verified, for about USD 0.002.
-> **Metric knowledge base:** [`aeids/knowledge/metrics.yaml`](aeids/knowledge/metrics.yaml) defines 41 metrics (margins, growth, ROE, free cash flow, leverage, BRSR intensities, women's representation, LTIFR, CSR spend) as fixed recipes of tested calculation steps, plus how US GAAP, Ind AS and BRSR reports name each line item. The agents pick a metric and the facts; code runs the recipe.
-> **New in M5:** Verification replays every calculation and checks every value against the table cell it came from (value, page, unit, currency, scale, period, current version). Wrong findings go back for at most two rework rounds; what still fails is dropped and listed as a limitation; what cannot be checked automatically waits for a person in the console.
-> **New in M6:** a single-agent RAG baseline and one command that benchmarks both on 37 questions: AEIDS answers 89–92% correctly (over several runs) vs 68–69%, with no unchecked numbers (baseline: 12%), at a median 4.6 s and USD 0.0004 per question ([results](#does-aeids-beat-one-rag-prompt)).
-> **New in M7:** every completed question gets a stored, checked report (JSON and Markdown): the answer, every calculation with its inputs, numbered sources down to the page and evidence record, limitations, review status and how it was made. Before it is stored, code checks that it contains every verified finding and nothing else. A report that fails the check is not stored, and the workflow fails instead. Download it from the answer page, `GET /api/v1/workflows/{id}/report.md`, or `python -m aeids.reporting <id>`.
-> **Since the Release 0 review:**
-> - checks you can trust: an upload must be the type it says it is, and ESG questions are answered only from ESG reports or BRSRs (D-035);
-> - a question about a company with no uploaded report is refused, for quoted answers too; countries and regulators ("US export controls") are not mistaken for companies (D-036);
-> - a local-only API guard and safer secrets (D-034);
-> - earnings per share in the knowledge base (D-033);
-> - a simpler console: mint and amber, a hideable history panel, illustrations.
-> **Not yet:** values printed only in prose or charts are not extracted.
+> **Release 0 is complete** (the seven milestones below) and [reviewed](docs/RELEASE_0_REVIEW.md): upload reports, ask questions, and get verified answers with page-level citations, saved as JSON and Markdown reports, in a web console with run tracing. A [metric knowledge base](aeids/knowledge/metrics.yaml) defines 41 metrics (margins, growth, ROE, free cash flow, leverage, BRSR intensities, CSR spend) as fixed recipes of tested calculation steps.
+>
+> **Example:** *"Compare Apple's revenue and operating margin FY2023–FY2025"* on Apple's 10-K gives 6 reported values (page 32) and 5 verified calculations (operating margin 29.82% → 31.51% → 31.97%) for about USD 0.002.
+>
+> **Not yet:** values printed only in prose or charts are not extracted, and ESG/BRSR reports are not yet in the benchmark. What changed in each milestone: [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 | Milestone | State |
 |---|---|
