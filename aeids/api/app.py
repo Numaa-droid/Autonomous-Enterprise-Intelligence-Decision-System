@@ -14,7 +14,7 @@ from sqlalchemy import text
 
 from aeids import tracing
 from aeids.api.routers import dashboard, documents, ingestion, search, workflows
-from aeids.api.security import LocalOnlyGuard
+from aeids.api.security import LocalOnlyGuard, ReadOnlyGuard
 from aeids.config import Settings, get_settings
 from aeids.db.session import make_engine, make_sessionmaker
 from aeids.documents import DocumentError
@@ -45,6 +45,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
     app.add_middleware(LocalOnlyGuard, allowed_hosts=settings.allowed_hosts)  # D-034
+    if settings.read_only:  # public demo: only search and questions (D-039)
+        app.add_middleware(ReadOnlyGuard)
     app.state.settings = settings
     app.state.engine = engine
     app.state.sessionmaker = make_sessionmaker(engine)

@@ -446,7 +446,8 @@ async function render(soft = false) {
   $("#page-title").textContent = arg && page === "traces" ? "Run details"
     : ["workflows", "search"].includes(page) ? "" : meta[1]; // these pages carry their own heading
   $("#page-crumb").textContent = arg && page === "traces" ? `Run ${arg.slice(0, 12)}…`
-    : arg && page === "documents" ? "One report: its status and versions. Pick another in the panel on the left." : meta[2];
+    : arg && page === "documents" ? "One report: its status and versions. Pick another in the panel on the left."
+    : page === "documents" && state.readOnly ? "The company reports loaded in this demo. Pick one in the panel on the left." : meta[2];
   if (soft && state.current?.refresh) { try { await state.current.refresh(); } catch (e) { /* keep page */ } return; }
   // quick clicks (page, tenant, theme) can start several renders: only the newest may touch the page
   const seq = (state.renderSeq = (state.renderSeq || 0) + 1);
@@ -791,7 +792,10 @@ async function viewDocuments(root, selected) {
     try { docs = await api(`/documents?${tq()}`); if (state.side) { state.side.docs = docs; drawSidebar(); } }
     catch (e) { if (/no tenant/i.test(e.message)) docs = []; else throw e; }
     if (!panelShown) {
-      root.prepend(uploadPanel([...new Set(docs.map((d) => d.company))], afterUpload));
+      root.prepend(state.readOnly
+        ? el("div", { class: "card fade-in" }, notice("info", el("b", {}, "Read-only demo. "),
+            "Uploading and deleting reports are turned off here. Pick a report on the left to see it, or use Ask to question the reports already loaded."))
+        : uploadPanel([...new Set(docs.map((d) => d.company))], afterUpload));
       panelShown = true;
     }
     drawList();
@@ -809,7 +813,7 @@ async function viewDocuments(root, selected) {
   };
   const drawList = () => {
     if (!docs.length) {
-      list.replaceChildren(card(null, null, empty("documents", "No reports yet", "Upload a PDF above. It shows up in the panel on the left, and you can follow it until it is ready.")));
+      list.replaceChildren(card(null, null, empty("documents", "No reports yet", state.readOnly ? "This demo has no reports loaded yet." : "Upload a PDF above. It shows up in the panel on the left, and you can follow it until it is ready.")));
       return;
     }
     // one report when picked in the side panel; otherwise only the ones still being read or failed
@@ -825,7 +829,7 @@ async function viewDocuments(root, selected) {
     const companies = [...new Set(docs.map((d) => d.company))];
     const order = ["pending", "parsing", "parsed", "indexing", "indexed"];
     const labels = ["Uploaded", "Reading the PDF", "Read", "Making it searchable", "Ready to use"];
-    const own = state.tenant === state.defaultTenant;
+    const own = state.tenant === state.defaultTenant && !state.readOnly; // demo: no upload, delete or retry
     list.replaceChildren(...shown.map((doc) => {
       const c = "var(--accent)"; // amber avatar
       const words = doc.company.replace(/[^A-Za-z ]/g, " ").split(/\s+/)
@@ -1069,7 +1073,7 @@ function drawReview(box, wf, reload) {
         } catch (e) { toast(e.message); }
       };
       const reason = (t.last_error || "This step could not finish.").replace(/^./, (c) => c.toUpperCase());
-      const buttons = open.length
+      const buttons = state.readOnly ? [] : open.length
         ? [el("button", { class: "btn primary", onclick: () => send("approve") }, icon("check"), "Looks right"),
            el("button", { class: "btn", onclick: () => send("reject") }, icon("x"), "Reject")]
         : [el("button", { class: "btn primary", onclick: () => send("rerun") }, icon("refresh"), "Try again"),
@@ -1077,9 +1081,11 @@ function drawReview(box, wf, reload) {
       return el("div", { class: "version" },
         el("div", {}, open.length ? `AEIDS could not check ${open.length} figure(s) automatically. Please look at them:` : reason),
         open.length ? el("ul", { class: "small", style: { margin: "8px 0" } }, open.map((f) => el("li", {}, f.claim))) : null,
-        el("div", { style: { marginTop: "12px" } }, note),
+        state.readOnly ? null : el("div", { style: { marginTop: "12px" } }, note),
         el("div", { style: { display: "flex", gap: "8px", marginTop: "10px", flexWrap: "wrap" } }, buttons),
-        open.length ? null : el("div", { class: "small muted", style: { marginTop: "8px" } },
+        state.readOnly ? el("div", { class: "small muted", style: { marginTop: "8px" } },
+          "This is a read-only demo, so this step cannot be approved, rejected or rerun here.")
+        : open.length ? null : el("div", { class: "small muted", style: { marginTop: "8px" } },
           "Upload the missing report on the Documents page, then press “Try again”."));
     })));
 }
@@ -1535,6 +1541,7 @@ async function loadTenants(select) {
   try {
     const t = await api("/tenants");
     state.defaultTenant = t.default;
+    state.readOnly = !!t.read_only; // public demo (D-039): no uploads, deletes or reviews
     if (t.models) $("#model-chip").replaceChildren(`AI models: ${t.models.llm} (answers), ${t.models.embedding} (search)`);
     const names = t.tenants.includes(t.default) ? t.tenants : [t.default, ...t.tenants]; // own tenant always listed
     state.tenants = names;

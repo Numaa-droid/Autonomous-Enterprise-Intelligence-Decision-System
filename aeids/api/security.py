@@ -63,6 +63,35 @@ class LocalOnlyGuard:
         await self.app(scope, receive, send)
 
 
+# The only changes a read-only demo accepts: searching and asking a question (D-039).
+READ_ONLY_ALLOWED = {
+    ("POST", "/api/v1/search"),
+    ("POST", "/api/v1/workflows"),
+    ("POST", "/api/v1/dashboard/search"),
+    ("POST", "/api/v1/dashboard/workflows"),
+}
+READ_ONLY_MESSAGE = ("This is a read-only demo: uploading, deleting and reviewing are turned off. "
+                     "You can still browse the reports, search them and ask questions.")
+
+
+class ReadOnlyGuard:
+    """``AEIDS_READ_ONLY=true`` (public demo, D-039): every POST, PUT, PATCH or DELETE is refused
+    (403) unless it is in ``READ_ONLY_ALLOWED``. An allow-list, so an endpoint added later is
+    read-only until it is listed here."""
+
+    def __init__(self, app: Callable[[Scope, Receive, Send], Awaitable[None]]) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "http":
+            method = scope.get("method", "GET").upper()
+            path = scope.get("path", "").rstrip("/") or "/"
+            if method in UNSAFE_METHODS and (method, path) not in READ_ONLY_ALLOWED:
+                await _refuse(scope, send, 403, "read_only", READ_ONLY_MESSAGE)
+                return
+        await self.app(scope, receive, send)
+
+
 async def _refuse(scope: Scope, send: Send, status: int, code: str, message: str) -> None:
     if scope["type"] == "websocket":
         await send({"type": "websocket.close", "code": 1008})

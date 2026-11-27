@@ -53,6 +53,14 @@ Record each design or library choice in a few lines: what was chosen, what else 
 
 ## Accepted decisions
 
+### D-039 — Read-only demo mode
+- Date: 2026-11-27
+- Status: accepted
+- Decision: `AEIDS_READ_ONLY=true` adds `ReadOnlyGuard` (`aeids/api/security.py`): every POST, PUT, PATCH or DELETE is refused with 403 `read_only` unless it is on an allow-list of four routes: `POST /api/v1/search`, `POST /api/v1/workflows` and their console twins under `/api/v1/dashboard`. `GET /api/v1/dashboard/tenants` reports `read_only`, and the console then shows a note instead of the upload panel and hides Delete, Upload a newer version, Try again and the review buttons.
+- Alternatives considered: login for editors (more than a demo needs, out of Release 0 scope); a deny-list of the current write routes (a route added later would be writable by default).
+- Why: the public Render demo linked from a resume had no login, so any visitor could upload or delete reports.
+- Consequences / follow-ups: questions still call OpenRouter, so a visitor spends the key's credit; keep a spending limit on the key (a per-visitor rate limit is not built). The owner uploads by switching the flag off, or with the API from a trusted machine while it is off.
+
 ### D-038 — Deleting a report archives it
 - Date: 2026-11-27
 - Status: accepted

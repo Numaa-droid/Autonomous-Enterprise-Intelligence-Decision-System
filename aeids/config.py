@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     )
     # Host names the API answers to; anything else is refused (DNS rebinding, D-034)
     allowed_hosts: list[str] = Field(default_factory=lambda: ["127.0.0.1", "localhost", "::1"], min_length=1)
+    # public demo (D-039): refuse every change except searching and asking questions
+    read_only: bool = False
     storage_root: Path = Path("./storage")
     max_upload_bytes: int = Field(default=100 * 1024 * 1024, gt=0)
     # TableLens _structure.json files grow to tens of MB on long reports

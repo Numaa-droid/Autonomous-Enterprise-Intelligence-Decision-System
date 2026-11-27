@@ -112,7 +112,8 @@ def _pct(values: list[float], p: int) -> float:
 def tenants(session: SessionDep, settings: SettingsDep) -> dict[str, Any]:
     names = list(session.scalars(select(Tenant.name).order_by(Tenant.name)))
     return {"default": settings.default_tenant_name, "tenants": names,
-            "models": {"embedding": settings.embedding_model, "llm": settings.llm_model}}
+            "models": {"embedding": settings.embedding_model, "llm": settings.llm_model},
+            "read_only": settings.read_only}
 
 
 @router.get("/overview")
