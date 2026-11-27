@@ -53,6 +53,14 @@ Record each design or library choice in a few lines: what was chosen, what else 
 
 ## Accepted decisions
 
+### D-037 — Render demo deployment: one service, inline jobs, Qdrant Cloud, TableLens over a tunnel
+- Date: 2026-11-27
+- Status: accepted (demo hosting, not production)
+- Decision: on Render, aeids-api runs migrations in its start command (`alembic upgrade head && uvicorn …`), uses `AEIDS_JOBS_MODE=inline` (the API parses and indexes an upload in the request; no worker, no Redis), Qdrant Cloud (`AEIDS_QDRANT_URL` + new `AEIDS_QDRANT_API_KEY`, read by `VectorIndex.from_settings`), and reaches TableLens on the developer's Mac through a Cloudflare tunnel (`AEIDS_TABLELENS_URL`). `.python-version` pins Python 3.11 (Render defaulted to 3.14).
+- Alternatives considered: a Render Background Worker + Key Value (no free worker plan, and it cannot read the API's local `storage/` disk); TableLens on Modal (always on, more setup; still the path for a lasting deployment).
+- Why: the first deploy failed with `relation "tenants" does not exist` (no migrations), then uploads waited forever (no worker, Redis, Qdrant or TableLens reachable).
+- Consequences / follow-ups: parsing works only while the Mac, TableLens and the tunnel run; a quick-tunnel URL changes on each restart (update `AEIDS_TABLELENS_URL`). Render's disk is ephemeral, so uploaded PDFs are lost on redeploy (parsed chunks stay in Postgres and Qdrant). The tunnel URL is unauthenticated: anyone who has it can send PDFs to TableLens.
+
 ### D-036 — Countries and regulators are not companies; a company without a report is refused for quote answers too
 - Date: 2026-11-24
 - Status: accepted

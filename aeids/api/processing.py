@@ -27,7 +27,7 @@ def tablelens_client(state: Any):
 
 def vector_index(state: Any) -> VectorIndex:
     if getattr(state, "vector_index", None) is None:
-        state.vector_index = VectorIndex.from_url(state.settings.qdrant_url)
+        state.vector_index = VectorIndex.from_settings(state.settings)
     return state.vector_index
 
 

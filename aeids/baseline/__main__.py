@@ -32,7 +32,7 @@ def main(argv: list[str] | None = None) -> int:
     engine = make_engine(settings.database_url)
     if settings.tracing_enabled:
         tracing.configure(tracing.SqlTraceSink(engine))
-    index = VectorIndex.from_url(settings.qdrant_url)
+    index = VectorIndex.from_settings(settings)
     embedder = OpenRouterEmbedder.from_settings(settings, cache=SqlQueryCache(engine))
     llm = OpenRouterClient(settings)
     name = args.tenant or settings.default_tenant_name

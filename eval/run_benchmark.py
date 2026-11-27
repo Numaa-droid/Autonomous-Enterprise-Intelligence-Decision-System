@@ -174,7 +174,7 @@ class Runner:
         self.engine = make_engine(settings.database_url)
         tracing.configure(tracing.SqlTraceSink(self.engine))  # tokens and cost are read from traces
         self.sessions = make_sessionmaker(self.engine)
-        self.index = VectorIndex.from_url(settings.qdrant_url)
+        self.index = VectorIndex.from_settings(settings)
         self.embedder = OpenRouterEmbedder.from_settings(settings, cache=SqlQueryCache(self.engine))
         self.store = LocalStore(settings.storage_root)
         self.llm = OpenRouterClient(settings)

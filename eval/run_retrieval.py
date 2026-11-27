@@ -222,7 +222,7 @@ def run(args: argparse.Namespace) -> int:
     engine = make_engine(settings.database_url)
     if settings.tracing_enabled:
         tracing.configure(tracing.SqlTraceSink(engine))
-    index = VectorIndex.from_url(settings.qdrant_url)
+    index = VectorIndex.from_settings(settings)
     embedder = OpenRouterEmbedder.from_settings(settings, cache=SqlQueryCache(engine))
     store = LocalStore(settings.storage_root)
     try:

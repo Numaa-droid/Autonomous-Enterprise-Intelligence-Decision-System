@@ -55,6 +55,8 @@ class Settings(BaseSettings):
 
     # --- services ---
     qdrant_url: str = "http://127.0.0.1:6333"
+    # hosted Qdrant (Qdrant Cloud) only; never printed (D-037)
+    qdrant_api_key: SecretStr | None = Field(default=None, repr=False)
     redis_url: str = "redis://127.0.0.1:6379/0"
 
     # --- TableLens (tablelens/app.py) parses uploaded PDFs (D-019) ---

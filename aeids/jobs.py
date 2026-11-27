@@ -183,7 +183,7 @@ def process_version_job(tenant_id: str, version_id: str, reuse_by_filename: bool
     if settings.tracing_enabled:
         tracing.configure(tracing.SqlTraceSink(engine))
     tablelens = make_tablelens(settings)
-    index = VectorIndex.from_url(settings.qdrant_url)
+    index = VectorIndex.from_settings(settings)
     embedder = OpenRouterEmbedder.from_settings(settings)
     try:
         with make_sessionmaker(engine)() as session:

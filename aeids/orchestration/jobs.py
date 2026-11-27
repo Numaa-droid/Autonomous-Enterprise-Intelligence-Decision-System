@@ -73,7 +73,7 @@ class _Env:
         if self.settings.tracing_enabled:
             tracing.configure(tracing.SqlTraceSink(self.engine))
         self.sessions = make_sessionmaker(self.engine)
-        self.index = VectorIndex.from_url(self.settings.qdrant_url)
+        self.index = VectorIndex.from_settings(self.settings)
         self.embedder = OpenRouterEmbedder.from_settings(self.settings, cache=SqlQueryCache(self.engine))
         self.registry = build_registry(self.settings)
 

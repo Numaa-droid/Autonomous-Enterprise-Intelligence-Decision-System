@@ -62,8 +62,15 @@ class VectorIndex:
         self._ready: set[str] = set()
 
     @classmethod
-    def from_url(cls, url: str) -> VectorIndex:
-        return cls(QdrantClient(url=url, timeout=30))
+    def from_url(cls, url: str, api_key: str | None = None) -> VectorIndex:
+        """``api_key``: for a hosted Qdrant (Qdrant Cloud); a local Qdrant needs none."""
+        return cls(QdrantClient(url=url, api_key=api_key or None, timeout=30))
+
+    @classmethod
+    def from_settings(cls, settings: Any) -> VectorIndex:
+        """URL and optional API key from ``AEIDS_QDRANT_URL`` / ``AEIDS_QDRANT_API_KEY``."""
+        key = settings.qdrant_api_key
+        return cls.from_url(settings.qdrant_url, key.get_secret_value() if key else None)
 
     def close(self) -> None:
         self.client.close()
