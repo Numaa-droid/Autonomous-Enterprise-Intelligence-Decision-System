@@ -185,7 +185,8 @@ class AgentContext:
             select(Company.id, Company.name)
             .join(Document, Document.company_id == Company.id)
             .join(DocumentVersion, DocumentVersion.document_id == Document.id)
-            .where(Company.tenant_id == self.tenant_id, DocumentVersion.is_current.is_(True))
+            .where(Company.tenant_id == self.tenant_id, DocumentVersion.is_current.is_(True),
+                   Document.status == DocumentStatus.ACTIVE.value)  # not deleted reports (D-038)
             .distinct().order_by(Company.name)).all()
         return [CompanyView(cid, name) for cid, name in rows]
 
@@ -199,6 +200,7 @@ class AgentContext:
         current = (select(Document.company_id)
                    .join(DocumentVersion, DocumentVersion.document_id == Document.id)
                    .where(Document.tenant_id == self.tenant_id, Document.company_id.in_(company_ids),
+                          Document.status == DocumentStatus.ACTIVE.value,
                           DocumentVersion.is_current.is_(True)))
         typed = current.where(Document.document_type.in_(sorted(doctype.ESG_FAMILY)))
         with_section = (current.join(DocumentChunk, DocumentChunk.version_id == DocumentVersion.id)

@@ -184,6 +184,9 @@ details.side-section[open] > .side-list { animation: side-drop 0.15s ease; }
 .btn.primary:hover { background: var(--accent-2); }
 .btn.ghost { background: transparent; border-color: transparent; }
 .btn.ghost:hover { background: var(--surface-3); }
+.btn.danger { color: var(--critical); }
+.btn.danger:hover { background: color-mix(in srgb, var(--critical) 12%, transparent); border-color: color-mix(in srgb, var(--critical) 40%, transparent); }
+.doc-actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .btn.icon { padding: 7px; }
 .select, .input {
   padding: 7px 10px; border-radius: 9px; border: 1px solid var(--line-2); background: var(--surface-2);

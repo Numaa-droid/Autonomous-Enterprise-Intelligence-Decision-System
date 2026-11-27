@@ -53,6 +53,14 @@ Record each design or library choice in a few lines: what was chosen, what else 
 
 ## Accepted decisions
 
+### D-038 — Deleting a report archives it
+- Date: 2026-11-27
+- Status: accepted
+- Decision: `DELETE /api/v1/documents/{id}` (and a Delete button with a confirmation on the console's report card) sets `documents.status` to `archived` (`aeids.documents.archive_document`). Archived reports are left out of `GET /api/v1/documents`, the console list, `get_document` (404), new versions, upload dedupe, the agents' company list and ESG sources (`AgentContext.companies`, `esg_sources`); search already required `status = active`. Their Qdrant points are deleted best effort (if Qdrant is down the delete still succeeds; search re-checks Postgres).
+- Alternatives considered: erasing the rows, chunks and stored file (breaks the evidence of findings and reports that cite the report, rule 1); only flipping `is_current` off (a state change outside the versioning rule, and the report would still be listed).
+- Why: a report uploaded before the Render deployment could process it stayed "Waiting" with no way to remove it.
+- Consequences / follow-ups: there is no undelete; an archived report's rows and stored PDF stay until a retention job exists. Re-uploading the same PDF creates a new report (dedupe skips archived ones).
+
 ### D-037 — Render demo deployment: one service, inline jobs, Qdrant Cloud, TableLens over a tunnel
 - Date: 2026-11-27
 - Status: accepted (demo hosting, not production)

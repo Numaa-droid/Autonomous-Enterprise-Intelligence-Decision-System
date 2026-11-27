@@ -476,7 +476,11 @@ curl -F file=@report.pdf -F company_name="Acme Ltd" -F document_type=annual_repo
 # upload a replacement version, then list versions and their processing status
 curl -F file=@report-v2.pdf http://127.0.0.1:8001/api/v1/documents/<document_id>/versions
 curl http://127.0.0.1:8001/api/v1/documents/<document_id>/versions
+# delete a report (the console's Delete button does the same; D-038)
+curl -X DELETE http://127.0.0.1:8001/api/v1/documents/<document_id>
 ```
+
+Deleting archives the report: it leaves the report list, search and new questions, and its search vectors are removed from Qdrant. Its rows stay in Postgres, so answers given earlier keep their sources, and the same PDF can be uploaded again as a new report.
 
 The document type must match the PDF (D-035):
 - **The check:** AEIDS reads the cover and a sample of pages ("Form 10-K", "Annual Report", "Sustainability Report", "Business Responsibility and Sustainability Report", financial statements, Scope 1/2 emissions, BRSR principles).

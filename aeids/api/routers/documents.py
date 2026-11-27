@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from typing import Annotated
 
@@ -10,9 +11,12 @@ from sqlalchemy.orm import Session
 
 from aeids import documents as docs
 from aeids.api.deps import SessionDep, SettingsDep, StoreDep, TenantDep
-from aeids.api.processing import schedule_processing
+from aeids.api.processing import schedule_processing, vector_index
 from aeids.api.schemas import DocumentOut, ErrorOut, UploadOut, VersionOut
 from aeids.db.models import Document, DocumentType
+from aeids.retrieval.vector_index import VectorIndexError
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/documents", tags=["documents"])
 
@@ -127,6 +131,25 @@ def list_documents(session: SessionDep, tenant_id: TenantDep) -> list[DocumentOu
 @router.get("/{document_id}", response_model=DocumentOut, responses={404: {"model": ErrorOut}})
 def get_document(document_id: uuid.UUID, session: SessionDep, tenant_id: TenantDep) -> DocumentOut:
     return _document_out(session, docs.get_document(session, tenant_id, document_id))
+
+
+@router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT,
+               responses={404: {"model": ErrorOut}})
+def delete_document(document_id: uuid.UUID, request: Request, session: SessionDep,
+                    tenant_id: TenantDep) -> Response:
+    """Delete a report (D-038): archived in Postgres, so past findings keep their evidence; it
+    leaves listings, search and questions, and the same PDF can be uploaded again. Its vector
+    points are removed best effort (search re-checks Postgres, so leftovers are never shown)."""
+    versions = docs.archive_document(session, tenant_id, document_id)
+    indexed = [v for v in versions if v.index_collection]
+    if indexed:
+        try:
+            index = vector_index(request.app.state)
+            for v in indexed:
+                index.delete_version(v.index_collection, tenant_id, v.id)
+        except VectorIndexError as exc:
+            log.warning("document %s deleted; its vector points remain: %s", document_id, exc.message)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get(

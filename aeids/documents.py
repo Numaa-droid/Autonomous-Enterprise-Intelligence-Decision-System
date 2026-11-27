@@ -185,8 +185,10 @@ def get_or_create_company(session: Session, tenant_id: uuid.UUID, name: str) -> 
 
 
 def get_document(session: Session, tenant_id: uuid.UUID, document_id: uuid.UUID) -> Document:
+    """An active document of the tenant; an archived (deleted) one is not found (D-038)."""
     doc = session.scalar(
-        select(Document).where(Document.id == document_id, Document.tenant_id == tenant_id)
+        select(Document).where(Document.id == document_id, Document.tenant_id == tenant_id,
+                               Document.status == DocumentStatus.ACTIVE.value)
     )
     if doc is None:
         raise DocumentNotFound("document not found")
@@ -196,9 +198,24 @@ def get_document(session: Session, tenant_id: uuid.UUID, document_id: uuid.UUID)
 def list_documents(session: Session, tenant_id: uuid.UUID) -> list[Document]:
     return list(
         session.scalars(
-            select(Document).where(Document.tenant_id == tenant_id).order_by(Document.created_at)
+            select(Document)
+            .where(Document.tenant_id == tenant_id, Document.status == DocumentStatus.ACTIVE.value)
+            .order_by(Document.created_at)
         )
     )
+
+
+def archive_document(session: Session, tenant_id: uuid.UUID,
+                     document_id: uuid.UUID) -> list[DocumentVersion]:
+    """Delete a document from the user's view (D-038): it is archived, not erased, so findings
+    and reports that cite its evidence keep their sources (rule 1). Archived documents are left
+    out of listings, search, the agents' company list and upload dedupe. Returns its versions
+    (the caller removes their vector points)."""
+    doc = get_document(session, tenant_id, document_id)
+    doc.status = DocumentStatus.ARCHIVED.value
+    versions = list(doc.versions)
+    session.commit()
+    return versions
 
 
 def list_versions(
@@ -242,7 +259,9 @@ def create_document(
     try:
         existing = session.scalar(
             select(DocumentVersion)
-            .where(DocumentVersion.tenant_id == tenant_id, DocumentVersion.checksum == staged.sha256)
+            .join(Document, Document.id == DocumentVersion.document_id)
+            .where(DocumentVersion.tenant_id == tenant_id, DocumentVersion.checksum == staged.sha256,
+                   Document.status == DocumentStatus.ACTIVE.value)  # a deleted report can be re-uploaded
             .order_by(DocumentVersion.uploaded_at)
             .limit(1)
         )
@@ -283,7 +302,8 @@ def add_version(
         # Lock the document row (Postgres) so concurrent uploads get distinct version numbers.
         document = session.scalar(
             select(Document)
-            .where(Document.id == document_id, Document.tenant_id == tenant_id)
+            .where(Document.id == document_id, Document.tenant_id == tenant_id,
+                   Document.status == DocumentStatus.ACTIVE.value)
             .with_for_update()
         )
         if document is None:

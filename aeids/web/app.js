@@ -26,6 +26,7 @@ const P = {
   spinner: '<path d="M12 3a9 9 0 1 0 9 9"/>',
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   upload: '<path d="M12 16V4M7 9l5-5 5 5M4 20h16"/>',
+  trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/>',
   download: '<path d="M12 4v12M7 11l5 5 5-5M4 20h16"/>',
   lens: '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 9v12"/>',
   chunks: '<rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/>',
@@ -753,6 +754,20 @@ function versionUploadButton(doc, onUploaded) {
   return { button, input, below: el("div", {}, progress.box, result) };
 }
 
+async function deleteReport(doc, btn) {
+  const what = `${doc.company}${doc.fiscal_year ? ` FY${doc.fiscal_year}` : ""} (${doc.filename})`;
+  if (!window.confirm(`Delete ${what}?\n\nIt disappears from the report list, search and new questions. Answers already given keep their sources. You can upload the same PDF again later.`)) return;
+  btn.disabled = true;
+  try {
+    await api(`/api/v1/documents/${encodeURIComponent(doc.id)}`, { method: "DELETE" });
+    if (state.side) { state.side.docs = (state.side.docs || []).filter((d) => d.id !== doc.id); drawSidebar(); }
+    if (location.hash !== "#/documents") location.hash = "#/documents"; else window.dispatchEvent(new HashChangeEvent("hashchange"));
+  } catch (e) {
+    btn.disabled = false;
+    toast(e.message);
+  }
+}
+
 async function processAgain(doc, v, btn, out) {
   btn.disabled = true;
   try {
@@ -822,7 +837,9 @@ async function viewDocuments(root, selected) {
         el("div", { class: "doc-head" }, el("div", { class: "doc-avatar", vars: { "--c": c } }, initials),
           el("div", { style: { minWidth: 0 } }, el("h3", {}, doc.company),
             el("div", { class: "meta" }, `${doc.filename} · ${doc.document_type.replace("_", " ")}${doc.fiscal_year ? ` · FY${doc.fiscal_year}` : ""} · ${doc.versions.length} version${doc.versions.length === 1 ? "" : "s"}`)),
-          up ? el("div", { style: { marginLeft: "auto" } }, up.button, up.input) : null),
+          own ? el("div", { class: "doc-actions" }, up.button, up.input,
+            el("button", { class: "btn danger", type: "button", title: "Remove this report from AEIDS",
+              onclick: (e) => deleteReport(doc, e.currentTarget) }, icon("trash"), "Delete")) : null),
         up ? up.below : null,
         [...doc.versions].reverse().map((v) => {
           const idx = order.indexOf(v.status);

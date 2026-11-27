@@ -30,7 +30,15 @@ from sqlalchemy.orm import Session
 from aeids import tracing
 from aeids.api.deps import SessionDep, SettingsDep
 from aeids.api.processing import embedder, vector_index
-from aeids.db.models import Company, Document, DocumentChunk, DocumentVersion, Tenant, TraceSpan
+from aeids.db.models import (
+    Company,
+    Document,
+    DocumentChunk,
+    DocumentStatus,
+    DocumentVersion,
+    Tenant,
+    TraceSpan,
+)
 from aeids.documents import DocumentError
 from aeids.retrieval.search import SearchFilters, search
 
@@ -232,7 +240,8 @@ def documents(session: SessionDep, settings: SettingsDep,
         .group_by(DocumentChunk.version_id)).all())
     rows = session.execute(
         select(Document, Company.name).join(Company, Company.id == Document.company_id)
-        .where(Document.tenant_id == t.id).order_by(Company.name, Document.created_at)).all()
+        .where(Document.tenant_id == t.id, Document.status == DocumentStatus.ACTIVE.value)  # D-038
+        .order_by(Company.name, Document.created_at)).all()
     return [{
         "id": doc.id, "company": company, "filename": doc.filename,
         "document_type": doc.document_type, "fiscal_year": doc.fiscal_year,
